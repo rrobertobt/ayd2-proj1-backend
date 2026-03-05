@@ -2,8 +2,14 @@ package edu.robertob.ayd2_p1_backend.auth.users.services;
 
 import edu.robertob.ayd2_p1_backend.auth.roles.models.entities.RoleModel;
 import edu.robertob.ayd2_p1_backend.auth.roles.services.RoleService;
+import edu.robertob.ayd2_p1_backend.auth.users.mappers.UserMapper;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.CreateUserDTO;
+import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserDTO;
+import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserMeDTO;
+import edu.robertob.ayd2_p1_backend.auth.users.models.entities.EmployeeModel;
+import edu.robertob.ayd2_p1_backend.auth.users.repositories.EmployeeRepository;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,19 +20,15 @@ import edu.robertob.ayd2_p1_backend.auth.users.models.entities.UserModel;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 
 @Service
+@RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 public class UserService {
 
     private final UserRepository userRepository;
     private final RoleService roleService;
     private final PasswordEncoder passwordEncoder;
-
-    @Autowired
-    public UserService(UserRepository userRepository, RoleService roleService, PasswordEncoder passwordEncoder) {
-        this.userRepository = userRepository;
-        this.roleService = roleService;
-        this.passwordEncoder = passwordEncoder;
-    }
+    private final EmployeeRepository employeeRepository;
+    private final UserMapper userMapper;
 
     /**
      * Guarda un nuevo usuario en la base de datos.
@@ -66,9 +68,17 @@ public class UserService {
      * @throws NotFoundException si no existe un usuario con el nombre proporcionado
      */
     public UserModel getUserByUsername(String username) throws NotFoundException {
-        UserModel UserModel = userRepository.findUserByUsername(username).orElseThrow(
+        UserModel user = userRepository.findUserByUsername(username).orElseThrow(
                 () -> new NotFoundException("No se encontró un usuario con el ID proporcionado."));
-        return UserModel;
+        return user;
+    }
+
+    public UserDTO getAuthenticatedUserByUsername(String username) throws NotFoundException {
+        UserModel user = userRepository.findUserByUsername(username).orElseThrow(
+                () -> new NotFoundException("No se encontró un usuario con el ID proporcionado."));
+        EmployeeModel employee = employeeRepository.findByUserId(user.getId()).orElse(null);
+
+        return userMapper.userToUserDTO(user, employee);
     }
 
     public Long count() {

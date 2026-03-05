@@ -102,7 +102,7 @@ public class UserController {
     @GetMapping("/me")
     public UserDTO getAuthenticatedUser(@AuthenticationPrincipal UserDetails userDetails)
             throws NotFoundException {
-        UserModel user = userService.getUserByUsername(userDetails.getUsername());
-        return userMapper.userToUserDTO(user);
+        UserDTO user = userService.getAuthenticatedUserByUsername(userDetails.getUsername());
+        return user;
     }
 }

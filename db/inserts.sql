@@ -12,3 +12,10 @@ SELECT
     id
 FROM roles
 WHERE code = 'SYSTEM_ADMIN';
+
+INSERT INTO employees (user_id, first_name, last_name, hourly_rate)
+SELECT
+    (SELECT id FROM users WHERE username = 'superadmin'),
+    'Super',
+    'Admin',
+    0.00;

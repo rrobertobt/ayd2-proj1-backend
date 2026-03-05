@@ -3,12 +3,8 @@ package edu.robertob.ayd2_p1_backend.auth.users.models.entities;
 import edu.robertob.ayd2_p1_backend.auth.roles.models.entities.RoleModel;
 import edu.robertob.ayd2_p1_backend.core.models.entities.BaseModel;
 import jakarta.persistence.*;
+import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;
-
-
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "users")
@@ -24,11 +20,11 @@ public class UserModel extends BaseModel {
     @Column(nullable = false, unique = true, length = 200)
     private String email;
 
-    @Column()
-    private String password_hash;
+    @Column(nullable = false)
+    private boolean active;
 
     @Column()
-    private boolean active = true;
+    private String password_hash;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "role_id", nullable = false)

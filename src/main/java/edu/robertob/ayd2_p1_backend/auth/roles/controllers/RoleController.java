@@ -44,7 +44,7 @@ public class RoleController {
             @ApiResponse(responseCode = "500", description = "Error interno al intentar obtener los roles")
     })
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.OK)
     public List<RoleDTO> getAllRoles() {
         List<RoleModel> rolesEnums = roleService.findAllRoles();

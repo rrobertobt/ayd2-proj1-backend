@@ -37,7 +37,6 @@ CREATE TABLE employees
     user_id     BIGINT UNIQUE REFERENCES users (id), -- 1-1 (opcional, pero único si existe)
     first_name  VARCHAR(120)   NOT NULL,
     last_name   VARCHAR(120)   NOT NULL,
-    email       VARCHAR(200)   NOT NULL UNIQUE,
     hourly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
     active      BOOLEAN        NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
