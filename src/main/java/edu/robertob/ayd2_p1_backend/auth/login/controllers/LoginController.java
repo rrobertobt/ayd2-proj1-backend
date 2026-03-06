@@ -38,7 +38,6 @@ public class LoginController {
     @PostMapping
     @ResponseStatus(HttpStatus.OK)
     public LoginResponseDTO login(@RequestBody @Valid LoginDTO loginDTO) {
-        System.out.println("Recibida solicitud de login para el usuario: " + loginDTO.getUsername());
         return loginService.login(loginDTO);
     }
 

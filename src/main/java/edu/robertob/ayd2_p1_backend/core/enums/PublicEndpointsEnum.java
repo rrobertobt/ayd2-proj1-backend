@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 public enum PublicEndpointsEnum {
 
     AUTH_LOGIN(HttpMethod.POST, "/api/v1/login"),
+    ONBOARDING_SET_PASSWORD(HttpMethod.POST, "/api/v1/users/onboarding/set-password"),
     SWAGGER_UI(null, "/swagger-ui/**"),
     API_DOCS(null, "/v3/api-docs/**"),
     ;

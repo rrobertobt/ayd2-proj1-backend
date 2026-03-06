@@ -44,7 +44,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         // Saltar validación si es endpoint público
         if (isPublicEndpoint(request)) {
-            System.out.println("Endpoint público detectado, saltando autenticación JWT: " + request.getRequestURI());
             filterChain.doFilter(request, response);
             return;
         }

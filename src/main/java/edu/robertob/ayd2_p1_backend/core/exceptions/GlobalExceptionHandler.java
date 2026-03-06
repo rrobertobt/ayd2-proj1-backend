@@ -51,6 +51,13 @@ public class GlobalExceptionHandler {
         return new ErrorDTO(ex.getMessage());
     }
 
+    /** 400 – token de onboarding inválido o expirado */
+    @ExceptionHandler(InvalidTokenException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorDTO handleInvalidToken(InvalidTokenException ex) {
+        return new ErrorDTO(ex.getMessage());
+    }
+
     /** 400 – validación de campos (@Valid) */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)

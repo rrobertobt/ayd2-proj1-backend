@@ -30,6 +30,13 @@ public class UserModel extends BaseModel {
     @JoinColumn(name = "role_id", nullable = false)
     private RoleModel role;
 
+    /**
+     * Optional back-reference to the employee profile.
+     * Used by JPA Specifications for filtering; not loaded eagerly.
+     */
+    @OneToOne(mappedBy = "user", fetch = FetchType.LAZY, optional = true)
+    private EmployeeModel employee;
+
     public UserModel(Long id, String username, String email, String password, RoleModel role) {
         super(id);
         this.username = username;

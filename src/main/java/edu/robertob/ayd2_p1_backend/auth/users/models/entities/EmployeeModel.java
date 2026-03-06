@@ -26,8 +26,8 @@ public class EmployeeModel extends BaseModel {
     @Column(nullable = false)
     private Double hourly_rate;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @OneToOne
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     @JsonIgnore
     private UserModel user;
 
