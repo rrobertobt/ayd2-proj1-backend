@@ -9,7 +9,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.ITemplateEngine;
 import org.thymeleaf.context.Context;
 
 import java.util.Map;
@@ -20,7 +20,7 @@ import java.util.Map;
 public class MailService {
 
     private final JavaMailSender mailSender;
-    private final TemplateEngine templateEngine;
+    private final ITemplateEngine templateEngine;
 
     @Value("${spring.mail.username}")
     private String from;
