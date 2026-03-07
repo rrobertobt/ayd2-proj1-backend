@@ -316,8 +316,10 @@ public class UserManagementService {
         tokenModel.setExpiresAt(Instant.now().plus(ONBOARDING_TOKEN_EXPIRATION_HOURS, ChronoUnit.HOURS));
         onboardingTokenRepository.save(tokenModel);
 
-        String link = appProperties.getBackendHost()
-                + "/api/v1/users/onboarding?token=" + rawToken;
+        // String link = appProperties.getBackendHost()
+        //         + "/api/v1/users/onboarding?token=" + rawToken;
+        String link = appProperties.getFrontendHost()
+                + "/onboarding?token=" + rawToken;
 
         mailService.sendHtmlEmail(
                 user.getEmail(),

@@ -1,5 +1,6 @@
 package edu.robertob.ayd2_p1_backend.auth.users.services;
 
+import edu.robertob.ayd2_p1_backend.auth.roles.models.entities.RoleModel;
 import edu.robertob.ayd2_p1_backend.auth.users.mappers.UserMapper;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserMeDTO;
@@ -54,6 +55,28 @@ public class UserService {
         UserModel user = getUserByUsername(username);
         EmployeeModel employee = employeeRepository.findByUserId(user.getId()).orElse(null);
         return userMapper.userToUserMeDTO(user, employee);
+    }
+
+    /**
+     * Crea el usuario cuando no existe por username.
+     * Si ya existe, devuelve el usuario encontrado.
+     */
+    public UserModel createUserIfNotExists(
+            String username,
+            String email,
+            String passwordHash,
+            boolean active,
+            RoleModel role
+    ) {
+        return userRepository.findUserByUsername(username).orElseGet(() -> {
+            UserModel user = new UserModel();
+            user.setUsername(username);
+            user.setEmail(email);
+            user.setPassword_hash(passwordHash);
+            user.setActive(active);
+            user.setRole(role);
+            return userRepository.save(user);
+        });
     }
 
     public Long count() {

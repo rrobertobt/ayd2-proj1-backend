@@ -3,12 +3,13 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-application.properties
-application.yml
-application.yaml
-./src/main/resources/application.properties
-./src/main/resources/application.yml
-./src/main/resources/application.yaml
+
+
+# ignore any application.something file in the resources folder, but not in other folders
+application.*
+
+#env
+*.env
 
 ### STS ###
 .apt_generated
