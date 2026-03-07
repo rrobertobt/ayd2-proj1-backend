@@ -29,17 +29,14 @@ public class JwtGeneratorService {
     private static final String ROLE_KEY = "ROLE_";
 
     public String generateToken(UserModel user) {
-        System.out.println("Generando token para el usuario: " + user.getUsername() + " con rol: " + user.getRole().getCode().getCode());
         // mandmaos a cargar las clims (las base porue solo esas son necesarias)
         Map<String, Object> claims = new HashMap<>();
 
         // Agregar el rol del usuario en las autorities
         claims.put(CLAIM_NAME_USER_TYPE, ROLE_KEY + user.getRole().getCode().getCode());
-        System.out.println("Claims generadas para el token: " + claims);
 
         // Generar el token
         String token = createToken(claims, user.getUsername());
-        System.out.println("Token JWT generado: " + token);
         return token;
     }
 
@@ -54,7 +51,6 @@ public class JwtGeneratorService {
      * @return Token JWT firmado como cadena.
      */
     private String createToken(Map<String, Object> claims, String username) {
-        System.out.println("Creando token JWT para el usuario: " + username + " con claims: " + claims);
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(username)

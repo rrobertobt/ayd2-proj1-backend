@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bienvenido al sistema</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f4f6f8;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .header {
+            background-color: #1e3a5f;
+            padding: 32px 40px;
+            text-align: center;
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .body {
+            padding: 32px 40px;
+            color: #333333;
+        }
+        .body p {
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0 0 16px;
+        }
+        .highlight-box {
+            background-color: #f0f4ff;
+            border-left: 4px solid #1e3a5f;
+            padding: 16px 20px;
+            border-radius: 4px;
+            margin: 24px 0;
+        }
+        .highlight-box p {
+            margin: 0;
+            font-weight: 600;
+            color: #1e3a5f;
+            font-size: 14px;
+        }
+        .btn-container {
+            text-align: center;
+            margin: 28px 0;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #1e3a5f;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 32px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .token-box {
+            background-color: #f7f7f7;
+            border: 1px solid #dddddd;
+            border-radius: 6px;
+            padding: 14px 20px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            letter-spacing: 2px;
+            color: #333333;
+            margin: 16px 0;
+        }
+        .footer {
+            background-color: #f4f6f8;
+            padding: 20px 40px;
+            text-align: center;
+            font-size: 12px;
+            color: #888888;
+        }
+        .footer a {
+            color: #1e3a5f;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>¡Bienvenido al sistema!</h1>
+    </div>
+    <div class="body">
+        <p>Hola, <strong th:text="${firstName}">Usuario</strong>.</p>
+        <p>Tu cuenta ha sido creada exitosamente. Para comenzar, necesitas establecer tu contraseña haciendo clic en el botón a continuación:</p>
+
+        <div class="btn-container">
+            <a th:href="${onboardingLink}" class="btn">Establecer mi contraseña</a>
+        </div>
+
+        <p>O bien, copia y pega el siguiente enlace en tu navegador:</p>
+        <div class="token-box" th:text="${onboardingLink}">https://...</div>
+
+        <div class="highlight-box">
+            <p>⏰ Este enlace expirará en <span th:text="${expirationHours}">24</span> horas.</p>
+        </div>
+
+        <p>Tu nombre de usuario es: <strong th:text="${username}">usuario</strong></p>
+
+        <p>Si no solicitaste esta cuenta o crees que fue un error, por favor ignora este mensaje o contacta al administrador del sistema.</p>
+    </div>
+    <div class="footer">
+        <p>Este correo fue generado automáticamente. Por favor no respondas a este mensaje.</p>
+    </div>
+</div>
+</body>
+</html>
+
