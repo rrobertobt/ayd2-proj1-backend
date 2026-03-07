@@ -16,6 +16,7 @@ import edu.robertob.ayd2_p1_backend.auth.users.repositories.OnboardingTokenRepos
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserRepository;
 import edu.robertob.ayd2_p1_backend.auth.users.enums.RolesEnum;
 import edu.robertob.ayd2_p1_backend.core.config.AppProperties;
+import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.DuplicateResourceException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.InvalidTokenException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
@@ -40,6 +41,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class UserManagementServiceTest {
@@ -77,7 +80,10 @@ class UserManagementServiceTest {
         UserDTO result = userManagementService.createUser(dto);
 
         assertSame(expected, result);
-        verify(userRepository).save(any(UserModel.class));
+        // Verify the user was saved with active=true
+        ArgumentCaptor<UserModel> userCaptor = ArgumentCaptor.forClass(UserModel.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertTrue(userCaptor.getValue().isActive());
         verify(employeeRepository).save(any(EmployeeModel.class));
         verify(mailService, never()).sendHtmlEmail(any(), any(), any(), any());
     }
@@ -105,6 +111,10 @@ class UserManagementServiceTest {
         UserDTO result = userManagementService.createUser(dto);
 
         assertSame(expected, result);
+        // Verify the user was saved with active=false (inactive until onboarding is completed)
+        ArgumentCaptor<UserModel> userCaptor = ArgumentCaptor.forClass(UserModel.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertFalse(userCaptor.getValue().isActive());
         verify(onboardingTokenRepository).save(any(OnboardingTokenModel.class));
         verify(mailService).sendHtmlEmail(eq("bob@mail.com"), any(), eq("email/onboarding-invitation"), any());
     }
@@ -331,42 +341,144 @@ class UserManagementServiceTest {
 
     @Test
     void toggleUserStatus_activeToInactive() throws NotFoundException {
+        UserModel admin = buildUser(99L, "admin", "admin@mail.com", buildRole(1L, RolesEnum.SYSTEM_ADMIN, "Admin"));
         UserModel user = buildUser(1L, "alice", "alice@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
         user.setActive(true);
         UserDTO expected = buildUserDTO(user, null);
 
+        when(userRepository.findUserByUsername("admin")).thenReturn(Optional.of(admin));
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        // active→inactive: no need to check pending tokens
         when(userRepository.save(user)).thenReturn(user);
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.empty());
         when(userMapper.userToUserDTO(user, null)).thenReturn(expected);
 
-        UserDTO result = userManagementService.toggleUserStatus(1L);
+        UserDTO result = userManagementService.toggleUserStatus(1L, "admin");
 
         assertSame(expected, result);
         assertFalse(user.isActive());
     }
 
     @Test
-    void toggleUserStatus_inactiveToActive() throws NotFoundException {
+    void toggleUserStatus_inactiveToActive_noPendingToken_succeeds() throws NotFoundException {
+        UserModel admin = buildUser(99L, "admin", "admin@mail.com", buildRole(1L, RolesEnum.SYSTEM_ADMIN, "Admin"));
         UserModel user = buildUser(2L, "bob", "bob@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
         user.setActive(false);
         UserDTO expected = buildUserDTO(user, null);
 
+        when(userRepository.findUserByUsername("admin")).thenReturn(Optional.of(admin));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(onboardingTokenRepository.existsByUserIdAndUsedFalse(2L)).thenReturn(false);
         when(userRepository.save(user)).thenReturn(user);
         when(employeeRepository.findByUserId(2L)).thenReturn(Optional.empty());
         when(userMapper.userToUserDTO(user, null)).thenReturn(expected);
 
-        userManagementService.toggleUserStatus(2L);
+        userManagementService.toggleUserStatus(2L, "admin");
 
         assertTrue(user.isActive());
     }
 
     @Test
+    void toggleUserStatus_inactiveToActive_pendingOnboardingToken_throwsBadRequestException() {
+        UserModel admin = buildUser(99L, "admin", "admin@mail.com", buildRole(1L, RolesEnum.SYSTEM_ADMIN, "Admin"));
+        UserModel user = buildUser(3L, "carol", "carol@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
+        user.setActive(false);
+
+        when(userRepository.findUserByUsername("admin")).thenReturn(Optional.of(admin));
+        when(userRepository.findById(3L)).thenReturn(Optional.of(user));
+        when(onboardingTokenRepository.existsByUserIdAndUsedFalse(3L)).thenReturn(true);
+
+        assertThrows(BadRequestException.class,
+                () -> userManagementService.toggleUserStatus(3L, "admin"));
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void toggleUserStatus_selfToggle_throwsBadRequestException() {
+        UserModel admin = buildUser(99L, "admin", "admin@mail.com", buildRole(1L, RolesEnum.SYSTEM_ADMIN, "Admin"));
+
+        when(userRepository.findUserByUsername("admin")).thenReturn(Optional.of(admin));
+
+        assertThrows(BadRequestException.class,
+                () -> userManagementService.toggleUserStatus(99L, "admin"));
+        verify(userRepository, never()).findById(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
     void toggleUserStatus_notFound_throwsNotFoundException() {
+        UserModel admin = buildUser(99L, "admin", "admin@mail.com", buildRole(1L, RolesEnum.SYSTEM_ADMIN, "Admin"));
+
+        when(userRepository.findUserByUsername("admin")).thenReturn(Optional.of(admin));
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> userManagementService.toggleUserStatus(999L));
+        assertThrows(NotFoundException.class, () -> userManagementService.toggleUserStatus(999L, "admin"));
+    }
+
+    // ── resendOnboardingEmail ─────────────────────────────────────────────────
+
+    @Test
+    void resendOnboardingEmail_userNotFound_throwsNotFoundException() {
+        when(userRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThrows(NotFoundException.class,
+                () -> userManagementService.resendOnboardingEmail(999L));
+        verifyNoInteractions(onboardingTokenRepository);
+    }
+
+    @Test
+    void resendOnboardingEmail_userAlreadyActive_throwsBadRequestException() {
+        UserModel user = buildUser(1L, "alice", "alice@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
+        user.setActive(true);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertThrows(BadRequestException.class,
+                () -> userManagementService.resendOnboardingEmail(1L));
+        verify(onboardingTokenRepository, never()).deleteByUserId(any());
+        verify(mailService, never()).sendHtmlEmail(any(), any(), any(), any());
+    }
+
+    @Test
+    void resendOnboardingEmail_inactiveUser_deletesOldTokensAndSendsEmail() throws NotFoundException {
+        UserModel user = buildUser(2L, "bob", "bob@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
+        user.setActive(false);
+        EmployeeModel emp = buildEmployee(3L, user);
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        doNothing().when(onboardingTokenRepository).deleteByUserId(2L);
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.of(emp));
+        when(onboardingTokenRepository.save(any(OnboardingTokenModel.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(appProperties.getFrontendHost()).thenReturn("http://localhost:3000");
+        doNothing().when(mailService).sendHtmlEmail(any(), any(), any(), any());
+
+        userManagementService.resendOnboardingEmail(2L);
+
+        verify(onboardingTokenRepository).deleteByUserId(2L);
+        verify(onboardingTokenRepository).save(any(OnboardingTokenModel.class));
+        verify(mailService).sendHtmlEmail(
+                eq("bob@mail.com"), any(), eq("email/onboarding-invitation"), any());
+    }
+
+    @Test
+    void resendOnboardingEmail_inactiveUserNoEmployee_usesUsernameAsFirstName() throws NotFoundException {
+        UserModel user = buildUser(3L, "charlie", "charlie@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
+        user.setActive(false);
+
+        when(userRepository.findById(3L)).thenReturn(Optional.of(user));
+        doNothing().when(onboardingTokenRepository).deleteByUserId(3L);
+        when(employeeRepository.findByUserId(3L)).thenReturn(Optional.empty());
+        when(onboardingTokenRepository.save(any(OnboardingTokenModel.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(appProperties.getFrontendHost()).thenReturn("http://localhost:3000");
+
+        ArgumentCaptor<java.util.Map> mapCaptor = ArgumentCaptor.forClass(java.util.Map.class);
+        doNothing().when(mailService).sendHtmlEmail(any(), any(), any(), mapCaptor.capture());
+
+        userManagementService.resendOnboardingEmail(3L);
+
+        java.util.Map<?, ?> templateVars = mapCaptor.getValue();
+        assertEquals("charlie", templateVars.get("firstName"));
     }
 
     // ── setPasswordFromOnboarding ─────────────────────────────────────────────

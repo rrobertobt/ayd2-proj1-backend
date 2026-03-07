@@ -16,6 +16,7 @@ import edu.robertob.ayd2_p1_backend.auth.users.repositories.OnboardingTokenRepos
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserRepository;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserSpecification;
 import edu.robertob.ayd2_p1_backend.core.config.AppProperties;
+import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.DuplicateResourceException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.InvalidTokenException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
@@ -90,9 +91,10 @@ public class UserManagementService {
         user.setUsername(dto.getUsername());
         user.setEmail(dto.getEmail());
         user.setRole(role);
-        user.setActive(true);
 
         boolean hasPassword = StringUtils.hasText(dto.getPassword());
+        // Users without a password start inactive until they complete onboarding
+        user.setActive(hasPassword);
         if (hasPassword) {
             user.setPassword_hash(passwordEncoder.encode(dto.getPassword()));
         } else {
@@ -245,14 +247,60 @@ public class UserManagementService {
 
     /**
      * Activates or deactivates a user account.
+     * Blocked when: the caller tries to toggle their own account, or when
+     * activation is attempted on a user who hasn't completed onboarding.
      */
-    public UserDTO toggleUserStatus(Long id) throws NotFoundException {
+    public UserDTO toggleUserStatus(Long id, String authenticatedUsername) throws NotFoundException {
+        UserModel authenticatedUser = userRepository.findUserByUsername(authenticatedUsername)
+                .orElseThrow(() -> new NotFoundException("No se encontró el usuario autenticado."));
+
+        if (authenticatedUser.getId().equals(id)) {
+            throw new BadRequestException(
+                    "No puedes activar o desactivar tu propia cuenta.");
+        }
+
         UserModel user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("No se encontró un usuario con el ID: " + id));
+
+        // Prevent activating a user who hasn't completed onboarding
+        if (!user.isActive() && onboardingTokenRepository.existsByUserIdAndUsedFalse(id)) {
+            throw new BadRequestException(
+                    "El usuario no puede ser activado porque aún no ha completado el proceso de onboarding.");
+        }
+
         user.setActive(!user.isActive());
         UserModel saved = userRepository.save(user);
         EmployeeModel emp = employeeRepository.findByUserId(id).orElse(null);
         return userMapper.userToUserDTO(saved, emp);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RESEND ONBOARDING EMAIL
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Resends the onboarding email to a user who has not yet completed the onboarding process.
+     * Deletes any existing (unused) tokens and issues a fresh one.
+     *
+     * @throws NotFoundException   if no user with the given ID exists
+     * @throws BadRequestException if the user is already active (onboarding already completed)
+     */
+    public void resendOnboardingEmail(Long userId) throws NotFoundException {
+        UserModel user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("No se encontró un usuario con el ID: " + userId));
+
+        if (user.isActive()) {
+            throw new BadRequestException(
+                    "El usuario ya completó el proceso de onboarding y se encuentra activo.");
+        }
+
+        // Invalidate any existing tokens before issuing a new one
+        onboardingTokenRepository.deleteByUserId(userId);
+
+        EmployeeModel emp = employeeRepository.findByUserId(userId).orElse(null);
+        String firstName = emp != null ? emp.getFirst_name() : user.getUsername();
+
+        sendOnboardingEmail(user, firstName);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

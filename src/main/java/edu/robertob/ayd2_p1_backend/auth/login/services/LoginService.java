@@ -49,6 +49,11 @@ public class LoginService {
                 throw new BadCredentialsException("Las credenciales son incorrectas");
             }
 
+            if (!user.isActive()) {
+                throw new BadCredentialsException(
+                        "La cuenta está desactivada. Contacte al administrador.");
+            }
+
             // si no fallo enntonces generar el token y retornar la respuesta
             String token = jwtGeneratorService.generateToken(user);
             EmployeeModel employee = employeeRepository.findByUserId(user.getId()).orElse(null);

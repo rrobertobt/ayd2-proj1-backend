@@ -114,6 +114,20 @@ class LoginServiceTest {
         verifyNoInteractions(passwordEncoder, jwtGeneratorService, employeeRepository);
     }
 
+    @Test
+    void login_shouldThrowBadCredentialsWhenUserIsInactive() throws NotFoundException {
+        LoginDTO loginDTO = new LoginDTO("john", "raw-pass");
+        UserModel user = buildUser(1L, "john", "john@mail.com", false);
+
+        when(userService.getUserByUsername("john")).thenReturn(user);
+        when(passwordEncoder.matches("raw-pass", "hashed")).thenReturn(true);
+
+        BadCredentialsException ex = assertThrows(BadCredentialsException.class,
+                () -> loginService.login(loginDTO));
+        assertTrue(ex.getMessage().contains("desactivada"));
+        verify(jwtGeneratorService, never()).generateToken(any());
+    }
+
     private UserModel buildUser(Long id, String username, String email, boolean active) {
         RoleModel role = new RoleModel();
         role.setId(7L);

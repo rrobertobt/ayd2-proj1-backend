@@ -29,5 +29,6 @@ jwt:
 # Custom application properties
 app:
   frontendHost: ${FRONTEND_HOST}
+  allowedOrigins: ${ALLOWED_ORIGINS}
 backend:
   host: http://localhost:8080

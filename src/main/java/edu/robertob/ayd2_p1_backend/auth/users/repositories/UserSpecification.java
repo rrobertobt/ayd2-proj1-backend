@@ -71,6 +71,11 @@ public final class UserSpecification {
                 predicates.add(cb.equal(root.get("role").get("id"), filter.getRoleId()));
             }
 
+            // ── Role Code ────────────────────────────────────────────────────
+            if (filter.getRoleCode() != null) {
+                predicates.add(cb.equal(root.get("role").get("code"), filter.getRoleCode()));
+            }
+
             // ── Active status ────────────────────────────────────────────────
             if (filter.getActive() != null) {
                 predicates.add(cb.equal(root.get("active"), filter.getActive()));

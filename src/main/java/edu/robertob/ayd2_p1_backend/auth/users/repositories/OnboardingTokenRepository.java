@@ -11,6 +11,8 @@ public interface OnboardingTokenRepository extends JpaRepository<OnboardingToken
 
     Optional<OnboardingTokenModel> findByTokenAndUsedFalse(String token);
 
+    boolean existsByUserIdAndUsedFalse(Long userId);
+
     void deleteByUserId(Long userId);
 }
 

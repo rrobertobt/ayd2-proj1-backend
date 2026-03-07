@@ -106,12 +106,23 @@ class UserControllerTest {
 
     @Test
     void toggleUserStatus_returnsToggledUserDTO() throws NotFoundException {
+        UserDetails userDetails = mock(UserDetails.class);
+        when(userDetails.getUsername()).thenReturn("admin");
         UserDTO expected = new UserDTO(5L, "eve", "eve@mail.com", false,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
-        when(userManagementService.toggleUserStatus(5L)).thenReturn(expected);
+        when(userManagementService.toggleUserStatus(5L, "admin")).thenReturn(expected);
 
-        UserDTO result = userController.toggleUserStatus(5L);
+        UserDTO result = userController.toggleUserStatus(5L, userDetails);
 
         assertSame(expected, result);
+    }
+
+    @Test
+    void resendOnboardingEmail_callsManagementService() throws NotFoundException {
+        doNothing().when(userManagementService).resendOnboardingEmail(7L);
+
+        userController.resendOnboardingEmail(7L);
+
+        verify(userManagementService).resendOnboardingEmail(7L);
     }
 }

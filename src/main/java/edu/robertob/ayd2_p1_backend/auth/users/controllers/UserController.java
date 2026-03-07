@@ -84,6 +84,7 @@ public class UserController {
                     - `lastName` – búsqueda parcial en apellido del empleado
                     - `email` – email exacto
                     - `roleId` – ID del rol
+                    - `roleCode` – código del rol: `SYSTEM_ADMIN` | `PROJECT_ADMIN` | `DEVELOPER`
                     - `active` – true / false
 
                     **Paginación:**
@@ -171,7 +172,26 @@ public class UserController {
     @PatchMapping("/{userId}/toggle-status")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public UserDTO toggleUserStatus(@PathVariable Long userId) throws NotFoundException {
-        return userManagementService.toggleUserStatus(userId);
+    public UserDTO toggleUserStatus(@PathVariable Long userId,
+                                    @AuthenticationPrincipal UserDetails userDetails) throws NotFoundException {
+        return userManagementService.toggleUserStatus(userId, userDetails.getUsername());
+    }
+
+    @Operation(
+            summary = "Reenviar correo de onboarding",
+            description = "Reenvía el correo de onboarding a un usuario inactivo que no ha completado el proceso. " +
+                    "Invalida cualquier token anterior y genera uno nuevo. Solo accesible para SYSTEM_ADMIN.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "Correo reenviado exitosamente"),
+                    @ApiResponse(responseCode = "400", description = "El usuario ya completó el onboarding y está activo"),
+                    @ApiResponse(responseCode = "404", description = "Usuario no encontrado"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @PostMapping("/{userId}/onboarding/resend")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    public void resendOnboardingEmail(@PathVariable Long userId) throws NotFoundException {
+        userManagementService.resendOnboardingEmail(userId);
     }
 }

@@ -58,6 +58,13 @@ public class GlobalExceptionHandler {
         return new ErrorDTO(ex.getMessage());
     }
 
+    /** 400 – solicitud inválida (ej. validación de negocio) */
+    @ExceptionHandler(BadRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorDTO handleBadRequest(BadRequestException ex) {
+        return new ErrorDTO(ex.getMessage());
+    }
+
     /** 400 – validación de campos (@Valid) */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
