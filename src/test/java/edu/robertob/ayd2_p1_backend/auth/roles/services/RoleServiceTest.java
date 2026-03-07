@@ -100,6 +100,42 @@ class RoleServiceTest {
         verify(roleRepository).findById(404L);
     }
 
+    @Test
+    void findRoleByCodeOrNull_whenExists_returnsRole() {
+        RoleModel role = buildRole(5L, RolesEnum.SYSTEM_ADMIN, "Administrador");
+        when(roleRepository.findByCode(RolesEnum.SYSTEM_ADMIN)).thenReturn(Optional.of(role));
+
+        RoleModel result = roleService.findRoleByCodeOrNull(RolesEnum.SYSTEM_ADMIN);
+
+        assertNotNull(result);
+        assertEquals(RolesEnum.SYSTEM_ADMIN, result.getCode());
+        verify(roleRepository).findByCode(RolesEnum.SYSTEM_ADMIN);
+    }
+
+    @Test
+    void createRoleIfNotExists_whenAlreadyExists_returnsExistingRole() {
+        RoleModel existing = buildRole(6L, RolesEnum.DEVELOPER, "Developer");
+        when(roleRepository.findByCode(RolesEnum.DEVELOPER)).thenReturn(Optional.of(existing));
+
+        RoleModel result = roleService.createRoleIfNotExists(RolesEnum.DEVELOPER, "Developer", "Dev role");
+
+        assertEquals(6L, result.getId());
+        verify(roleRepository).findByCode(RolesEnum.DEVELOPER);
+        verify(roleRepository, org.mockito.Mockito.never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void createRoleIfNotExists_whenNotExists_savesAndReturnsNewRole() {
+        RoleModel saved = buildRole(7L, RolesEnum.PROJECT_ADMIN, "Project Admin");
+        when(roleRepository.findByCode(RolesEnum.PROJECT_ADMIN)).thenReturn(Optional.empty());
+        when(roleRepository.save(org.mockito.ArgumentMatchers.any(RoleModel.class))).thenReturn(saved);
+
+        RoleModel result = roleService.createRoleIfNotExists(RolesEnum.PROJECT_ADMIN, "Project Admin", "PA role");
+
+        assertEquals(7L, result.getId());
+        verify(roleRepository).save(org.mockito.ArgumentMatchers.any(RoleModel.class));
+    }
+
     private RoleModel buildRole(Long id, RolesEnum code, String name) {
         RoleModel role = new RoleModel();
         role.setId(id);
