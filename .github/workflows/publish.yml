@@ -42,7 +42,7 @@ jobs:
           MAIL_PROTOCOL: ${{ secrets.MAIL_PROTOCOL }}
           MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
           MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-        run: docker compose -f docker-compose-build.yml build
+        run: docker compose -f docker-compose-build.yaml build
 
       - name: Tag and Push Spring Boot Backend Docker Image to Amazon ECR
         run: |
