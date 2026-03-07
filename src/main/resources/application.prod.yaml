@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: ayd2_p1_backend
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT}
+    protocol: ${MAIL_PROTOCOL}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            required: true
+            enable: true
+  # Database configuration
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+# Logging configuration
+logging:
+  level:
+    root: INFO
+# JWT configuration
+jwt:
+  secret: ${JWT_ACCESS_SECRET}
+# Custom application properties
+app:
+  frontendHost: ${FRONTEND_HOST}
+backend:
+  host: http://localhost:8080

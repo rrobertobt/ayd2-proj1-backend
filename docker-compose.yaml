@@ -1,0 +1,18 @@
+services:
+  ayd2p1-backend-spring:
+    image: 419392574943.dkr.ecr.us-east-1.amazonaws.com/ayd2p1-backend-spring:latest
+    container_name: ayd2p1-backend-spring
+    ports:
+      - "80:8080"
+    environment:
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - FRONTEND_HOST=${FRONTEND_HOST}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_PROTOCOL=${MAIL_PROTOCOL}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+    restart: unless-stopped

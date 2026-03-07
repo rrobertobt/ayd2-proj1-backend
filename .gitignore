@@ -6,7 +6,7 @@ target/
 
 
 # ignore any application.something file in the resources folder, but not in other folders
-application.*
+# application.*
 
 #env
 *.env
