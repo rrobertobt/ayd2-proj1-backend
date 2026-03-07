@@ -7,6 +7,7 @@ import org.springframework.http.HttpMethod;
 @AllArgsConstructor
 public enum PublicEndpointsEnum {
 
+    HEALTH(HttpMethod.GET, "/api/v1/health"),
     AUTH_LOGIN(HttpMethod.POST, "/api/v1/login"),
     ONBOARDING_SET_PASSWORD(HttpMethod.POST, "/api/v1/users/onboarding/set-password"),
     SWAGGER_UI(null, "/swagger-ui/**"),
