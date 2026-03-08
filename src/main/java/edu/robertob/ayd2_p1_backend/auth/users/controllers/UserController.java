@@ -82,6 +82,7 @@ public class UserController {
                     - `search` – búsqueda parcial en username y email
                     - `firstName` – búsqueda parcial en nombre del empleado
                     - `lastName` – búsqueda parcial en apellido del empleado
+                    - `fullName` – búsqueda parcial en nombre completo ("nombre apellido" o "apellido nombre")
                     - `email` – email exacto
                     - `roleId` – ID del rol
                     - `roleCode` – código del rol: `SYSTEM_ADMIN` | `PROJECT_ADMIN` | `DEVELOPER`

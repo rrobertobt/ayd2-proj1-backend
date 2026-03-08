@@ -22,6 +22,9 @@ public class UserFilterDTO {
     /** Filter by employee last name (case-insensitive, partial match). */
     private String lastName;
 
+    /** Filter by employee full name (case-insensitive, partial match on "firstName lastName" or "lastName firstName"). */
+    private String fullName;
+
     /** Filter by exact user email. */
     private String email;
 

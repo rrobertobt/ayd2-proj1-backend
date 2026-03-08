@@ -168,13 +168,19 @@ public class ProjectService {
                 .orElseThrow(() -> new NotFoundException(
                         "No se encontró un perfil de empleado para el usuario con ID: " + dto.getUserId()));
 
-        // Deactivate current active assignment if one exists
-        assignmentRepository.findByProjectIdAndActiveTrue(projectId)
-                .ifPresent(existing -> {
-                    existing.setActive(false);
-                    existing.setEndDate(LocalDate.now());
-                    assignmentRepository.save(existing);
-                });
+        // Deactivate current active assignment if one exists (and it's a different employee)
+        Optional<ProjectAdminAssignmentModel> current =
+                assignmentRepository.findByProjectIdAndActiveTrue(projectId);
+
+        if (current.isPresent()) {
+            if (current.get().getEmployee().getId().equals(employee.getId())) {
+                // Same admin already assigned — nothing to do
+                return toDTO(project, current.get());
+            }
+            current.get().setActive(false);
+            current.get().setEndDate(LocalDate.now());
+            assignmentRepository.saveAndFlush(current.get());
+        }
 
         // Create the new assignment
         ProjectAdminAssignmentModel newAssignment = new ProjectAdminAssignmentModel();
