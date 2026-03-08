@@ -5,6 +5,7 @@ public record UserDTO(
         String username,
         String email,
         boolean active,
+        boolean onboardingCompleted,
         RoleInfoDTO role,
         EmployeeDTO employee
 ) {

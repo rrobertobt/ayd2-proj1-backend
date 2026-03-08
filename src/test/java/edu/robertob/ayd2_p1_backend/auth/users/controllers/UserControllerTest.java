@@ -36,7 +36,7 @@ class UserControllerTest {
     void getAuthenticatedUser_returnsUserMeDTO() throws NotFoundException {
         UserDetails userDetails = mock(UserDetails.class);
         when(userDetails.getUsername()).thenReturn("alice");
-        UserMeDTO expected = new UserMeDTO(1L, "alice", "alice@mail.com", true,
+        UserMeDTO expected = new UserMeDTO(1L, "alice", "alice@mail.com", true, false,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
         when(userService.getMeByUsername("alice")).thenReturn(expected);
 
@@ -72,7 +72,7 @@ class UserControllerTest {
     @Test
     void createUser_returnsCreatedUserDTO() throws NotFoundException {
         CreateUserDTO dto = mock(CreateUserDTO.class);
-        UserDTO expected = new UserDTO(2L, "bob", "bob@mail.com", true,
+        UserDTO expected = new UserDTO(2L, "bob", "bob@mail.com", true, true,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
         when(userManagementService.createUser(dto)).thenReturn(expected);
 
@@ -83,7 +83,7 @@ class UserControllerTest {
 
     @Test
     void getUserById_returnsUserDTO() throws NotFoundException {
-        UserDTO expected = new UserDTO(3L, "carol", "carol@mail.com", true,
+        UserDTO expected = new UserDTO(3L, "carol", "carol@mail.com", true, true,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
         when(userManagementService.getUserById(3L)).thenReturn(expected);
 
@@ -95,7 +95,7 @@ class UserControllerTest {
     @Test
     void updateUser_returnsUpdatedUserDTO() throws NotFoundException {
         UpdateUserDTO dto = mock(UpdateUserDTO.class);
-        UserDTO expected = new UserDTO(4L, "dave", "dave@mail.com", true,
+        UserDTO expected = new UserDTO(4L, "dave", "dave@mail.com", true, true,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
         when(userManagementService.updateUser(4L, dto)).thenReturn(expected);
 
@@ -108,7 +108,7 @@ class UserControllerTest {
     void toggleUserStatus_returnsToggledUserDTO() throws NotFoundException {
         UserDetails userDetails = mock(UserDetails.class);
         when(userDetails.getUsername()).thenReturn("admin");
-        UserDTO expected = new UserDTO(5L, "eve", "eve@mail.com", false,
+        UserDTO expected = new UserDTO(5L, "eve", "eve@mail.com", false, true,
                 new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer"), null);
         when(userManagementService.toggleUserStatus(5L, "admin")).thenReturn(expected);
 

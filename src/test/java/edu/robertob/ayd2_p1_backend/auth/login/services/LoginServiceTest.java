@@ -54,7 +54,7 @@ class LoginServiceTest {
 
         UserDTO.RoleInfoDTO roleDTO = new UserDTO.RoleInfoDTO(7L, "SYSTEM_ADMIN", "Administrador");
         UserDTO.EmployeeDTO empDTO = new UserDTO.EmployeeDTO(99L, "John", "Doe", 50.0);
-        UserDTO userDTO = new UserDTO(1L, "john", "john@mail.com", true, roleDTO, empDTO);
+        UserDTO userDTO = new UserDTO(1L, "john", "john@mail.com", true, true, roleDTO, empDTO);
 
         when(userService.getUserByUsername("john")).thenReturn(user);
         when(passwordEncoder.matches("raw-pass", "hashed")).thenReturn(true);
@@ -78,7 +78,7 @@ class LoginServiceTest {
         UserModel user = buildUser(1L, "john", "john@mail.com", true);
 
         UserDTO.RoleInfoDTO roleDTO = new UserDTO.RoleInfoDTO(7L, "SYSTEM_ADMIN", "Administrador");
-        UserDTO userDTO = new UserDTO(1L, "john", "john@mail.com", true, roleDTO, null);
+        UserDTO userDTO = new UserDTO(1L, "john", "john@mail.com", true, true, roleDTO, null);
 
         when(userService.getUserByUsername("john")).thenReturn(user);
         when(passwordEncoder.matches("raw-pass", "hashed")).thenReturn(true);

@@ -23,6 +23,9 @@ public class UserModel extends BaseModel {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(name = "onboarding_completed", nullable = false)
+    private boolean onboardingCompleted = false;
+
     @Column()
     private String password_hash;
 

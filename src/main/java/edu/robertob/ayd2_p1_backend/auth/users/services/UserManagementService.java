@@ -95,6 +95,8 @@ public class UserManagementService {
         boolean hasPassword = StringUtils.hasText(dto.getPassword());
         // Users without a password start inactive until they complete onboarding
         user.setActive(hasPassword);
+        // Users created with an explicit password are considered onboarded immediately
+        user.setOnboardingCompleted(hasPassword);
         if (hasPassword) {
             user.setPassword_hash(passwordEncoder.encode(dto.getPassword()));
         } else {
@@ -289,9 +291,9 @@ public class UserManagementService {
         UserModel user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("No se encontró un usuario con el ID: " + userId));
 
-        if (user.isActive()) {
+        if (user.isOnboardingCompleted()) {
             throw new BadRequestException(
-                    "El usuario ya completó el proceso de onboarding y se encuentra activo.");
+                    "El usuario ya completó el proceso de onboarding.");
         }
 
         // Invalidate any existing tokens before issuing a new one
@@ -329,6 +331,7 @@ public class UserManagementService {
         UserModel user = tokenModel.getUser();
         user.setPassword_hash(passwordEncoder.encode(dto.getPassword()));
         user.setActive(true);
+        user.setOnboardingCompleted(true);
         userRepository.save(user);
 
         // Mark token as used

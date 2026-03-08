@@ -31,6 +31,7 @@ class UserMapperTest {
         assertEquals("alice", result.username());
         assertEquals("alice@mail.com", result.email());
         assertTrue(result.active());
+        assertFalse(result.onboardingCompleted());
 
         assertNotNull(result.role());
         assertEquals(10L, result.role().id());

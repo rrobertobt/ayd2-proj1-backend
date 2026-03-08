@@ -84,6 +84,7 @@ class UserManagementServiceTest {
         ArgumentCaptor<UserModel> userCaptor = ArgumentCaptor.forClass(UserModel.class);
         verify(userRepository).save(userCaptor.capture());
         assertTrue(userCaptor.getValue().isActive());
+        assertTrue(userCaptor.getValue().isOnboardingCompleted());
         verify(employeeRepository).save(any(EmployeeModel.class));
         verify(mailService, never()).sendHtmlEmail(any(), any(), any(), any());
     }
@@ -115,6 +116,7 @@ class UserManagementServiceTest {
         ArgumentCaptor<UserModel> userCaptor = ArgumentCaptor.forClass(UserModel.class);
         verify(userRepository).save(userCaptor.capture());
         assertFalse(userCaptor.getValue().isActive());
+        assertFalse(userCaptor.getValue().isOnboardingCompleted());
         verify(onboardingTokenRepository).save(any(OnboardingTokenModel.class));
         verify(mailService).sendHtmlEmail(eq("bob@mail.com"), any(), eq("email/onboarding-invitation"), any());
     }
@@ -427,9 +429,9 @@ class UserManagementServiceTest {
     }
 
     @Test
-    void resendOnboardingEmail_userAlreadyActive_throwsBadRequestException() {
+    void resendOnboardingEmail_userAlreadyCompletedOnboarding_throwsBadRequestException() {
         UserModel user = buildUser(1L, "alice", "alice@mail.com", buildRole(1L, RolesEnum.DEVELOPER, "Dev"));
-        user.setActive(true);
+        user.setOnboardingCompleted(true);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
         assertThrows(BadRequestException.class,
@@ -551,6 +553,7 @@ class UserManagementServiceTest {
 
         assertEquals("newhash", user.getPassword_hash());
         assertTrue(user.isActive());
+        assertTrue(user.isOnboardingCompleted());
         assertTrue(tokenModel.isUsed());
         verify(mailService).sendHtmlEmail(
                 eq("alice@mail.com"), any(), eq("email/password-set-confirmation"), any());
@@ -639,6 +642,6 @@ class UserManagementServiceTest {
                 user.getRole().getId(), user.getRole().getCode().name(), user.getRole().getName());
         UserDTO.EmployeeDTO employeeDTO = emp == null ? null :
                 new UserDTO.EmployeeDTO(emp.getId(), emp.getFirst_name(), emp.getLast_name(), emp.getHourly_rate());
-        return new UserDTO(user.getId(), user.getUsername(), user.getEmail(), user.isActive(), roleDTO, employeeDTO);
+        return new UserDTO(user.getId(), user.getUsername(), user.getEmail(), user.isActive(), user.isOnboardingCompleted(), roleDTO, employeeDTO);
     }
 }
