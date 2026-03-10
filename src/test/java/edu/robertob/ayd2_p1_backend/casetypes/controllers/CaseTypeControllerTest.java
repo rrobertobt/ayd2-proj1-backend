@@ -7,6 +7,7 @@ import edu.robertob.ayd2_p1_backend.casetypes.services.CaseTypeService;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.DuplicateResourceException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
+import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,26 +47,27 @@ class CaseTypeControllerTest {
     // ── getAllCaseTypes ────────────────────────────────────────────────────────
 
     @Test
-    void getAllCaseTypes_delegatesToServiceAndReturnsList() {
-        List<CaseTypeDTO> expected = List.of(
-                buildCaseTypeDTO(1L, "Bug", true),
-                buildCaseTypeDTO(2L, "Feature", true)
-        );
-        when(caseTypeService.getAllCaseTypes()).thenReturn(expected);
+    void getAllCaseTypes_delegatesToServiceAndReturnsPagedResult() {
+        CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
+        PagedResponseDTO<CaseTypeDTO> expected = new PagedResponseDTO<>(
+                List.of(buildCaseTypeDTO(1L, "Bug", true)), 0, 10, 1L, 1, true);
+        when(caseTypeService.getAllCaseTypes(filter)).thenReturn(expected);
 
-        List<CaseTypeDTO> result = caseTypeController.getAllCaseTypes();
+        PagedResponseDTO<CaseTypeDTO> result = caseTypeController.getAllCaseTypes(filter);
 
         assertSame(expected, result);
-        verify(caseTypeService).getAllCaseTypes();
+        verify(caseTypeService).getAllCaseTypes(filter);
     }
 
     @Test
-    void getAllCaseTypes_emptyList_returnsEmpty() {
-        when(caseTypeService.getAllCaseTypes()).thenReturn(List.of());
+    void getAllCaseTypes_emptyPage_returnsEmptyContent() {
+        CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
+        PagedResponseDTO<CaseTypeDTO> expected = new PagedResponseDTO<>(List.of(), 0, 10, 0L, 0, true);
+        when(caseTypeService.getAllCaseTypes(filter)).thenReturn(expected);
 
-        List<CaseTypeDTO> result = caseTypeController.getAllCaseTypes();
+        PagedResponseDTO<CaseTypeDTO> result = caseTypeController.getAllCaseTypes(filter);
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.content().isEmpty());
     }
 
     // ── getCaseTypeById ───────────────────────────────────────────────────────

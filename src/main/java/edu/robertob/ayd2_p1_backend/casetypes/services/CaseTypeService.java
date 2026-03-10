@@ -6,23 +6,35 @@ import edu.robertob.ayd2_p1_backend.casetypes.models.dto.response.CaseTypeStageD
 import edu.robertob.ayd2_p1_backend.casetypes.models.entities.CaseTypeModel;
 import edu.robertob.ayd2_p1_backend.casetypes.models.entities.CaseTypeStageModel;
 import edu.robertob.ayd2_p1_backend.casetypes.repositories.CaseTypeRepository;
+import edu.robertob.ayd2_p1_backend.casetypes.repositories.CaseTypeSpecification;
 import edu.robertob.ayd2_p1_backend.casetypes.repositories.CaseTypeStageRepository;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.DuplicateResourceException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
+import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 @Slf4j
 public class CaseTypeService {
+
+    private static final Map<String, String> SORT_FIELD_MAP = Map.of(
+            "name",      "name",
+            "createdAt", "createdAt"
+    );
 
     private final CaseTypeRepository caseTypeRepository;
     private final CaseTypeStageRepository stageRepository;
@@ -45,14 +57,34 @@ public class CaseTypeService {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<CaseTypeDTO> getAllCaseTypes() {
-        return caseTypeRepository.findAllByOrderByCreatedAtDesc().stream()
+    public PagedResponseDTO<CaseTypeDTO> getAllCaseTypes(CaseTypeFilterDTO filter) {
+        String sortField = SORT_FIELD_MAP.getOrDefault(filter.getSortBy(), "createdAt");
+        Sort sort = Sort.by(filter.direction(), sortField);
+        Pageable pageable = PageRequest.of(
+                Math.max(filter.getPage(), 0),
+                Math.min(Math.max(filter.getSize(), 1), 100),
+                sort
+        );
+
+        Page<CaseTypeModel> page = caseTypeRepository.findAll(
+                CaseTypeSpecification.from(filter), pageable);
+
+        var content = page.getContent().stream()
                 .map(ct -> {
                     List<CaseTypeStageModel> stages =
                             stageRepository.findByCaseTypeIdOrderByStageOrderAsc(ct.getId());
                     return toDTO(ct, stages);
                 })
                 .toList();
+
+        return new PagedResponseDTO<>(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
     }
 
     @Transactional(readOnly = true)

@@ -5,6 +5,7 @@ import edu.robertob.ayd2_p1_backend.casetypes.models.dto.response.CaseTypeDTO;
 import edu.robertob.ayd2_p1_backend.casetypes.models.dto.response.CaseTypeStageDTO;
 import edu.robertob.ayd2_p1_backend.casetypes.services.CaseTypeService;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
+import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -44,18 +45,30 @@ public class CaseTypeController {
     }
 
     @Operation(
-            summary = "Listar tipos de caso",
-            description = "Devuelve todos los tipos de caso con sus etapas. Solo accesible para SYSTEM_ADMIN.",
+            summary = "Listar tipos de caso (paginado y filtrado)",
+            description = """
+                    Devuelve una página de tipos de caso con sus etapas. Solo accesible para SYSTEM_ADMIN.
+
+                    **Filtros disponibles (query params):**
+                    - `search` – búsqueda parcial en nombre (case-insensitive)
+                    - `active` – filtrar por estado: `true` | `false`
+
+                    **Paginación:**
+                    - `page` – número de página (inicia en 0, default: 0)
+                    - `size` – tamaño de página (default: 10, máximo: 100)
+                    - `sortBy` – campo de ordenamiento: `name` | `createdAt` (default: `createdAt`)
+                    - `sortDir` – dirección: `asc` | `desc` (default: `desc`)
+                    """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Lista de tipos de caso"),
+                    @ApiResponse(responseCode = "200", description = "Página de tipos de caso"),
                     @ApiResponse(responseCode = "403", description = "Acceso denegado")
             })
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public List<CaseTypeDTO> getAllCaseTypes() {
-        return caseTypeService.getAllCaseTypes();
+    public PagedResponseDTO<CaseTypeDTO> getAllCaseTypes(@ModelAttribute CaseTypeFilterDTO filter) {
+        return caseTypeService.getAllCaseTypes(filter);
     }
 
     @Operation(

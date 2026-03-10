@@ -17,6 +17,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -88,31 +94,109 @@ class CaseTypeServiceTest {
     // ── getAllCaseTypes ────────────────────────────────────────────────────────
 
     @Test
-    void getAllCaseTypes_returnsListWithStages() {
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_returnsPagedResultWithStages() {
         CaseTypeModel ct1 = buildCaseType(1L, "Bug", "desc", true);
         CaseTypeModel ct2 = buildCaseType(2L, "Feature", null, true);
         CaseTypeStageModel stage = buildStage(10L, ct1, "Análisis", 1);
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of(ct1, ct2));
 
-        when(caseTypeRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(ct1, ct2));
+        when(caseTypeRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
         when(stageRepository.findByCaseTypeIdOrderByStageOrderAsc(1L)).thenReturn(List.of(stage));
         when(stageRepository.findByCaseTypeIdOrderByStageOrderAsc(2L)).thenReturn(List.of());
 
-        List<CaseTypeDTO> result = caseTypeService.getAllCaseTypes();
+        PagedResponseDTO<CaseTypeDTO> result = caseTypeService.getAllCaseTypes(new CaseTypeFilterDTO());
 
-        assertEquals(2, result.size());
-        assertEquals(1, result.get(0).stages().size());
-        assertEquals("Análisis", result.get(0).stages().get(0).name());
-        assertTrue(result.get(1).stages().isEmpty());
+        assertEquals(2, result.content().size());
+        assertEquals(1, result.content().get(0).stages().size());
+        assertEquals("Análisis", result.content().get(0).stages().get(0).name());
+        assertTrue(result.content().get(1).stages().isEmpty());
     }
 
     @Test
-    void getAllCaseTypes_emptyList_returnsEmpty() {
-        when(caseTypeRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_emptyPage_returnsEmpty() {
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of());
+        when(caseTypeRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
 
-        List<CaseTypeDTO> result = caseTypeService.getAllCaseTypes();
+        PagedResponseDTO<CaseTypeDTO> result = caseTypeService.getAllCaseTypes(new CaseTypeFilterDTO());
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.content().isEmpty());
         verify(stageRepository, never()).findByCaseTypeIdOrderByStageOrderAsc(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_paginationParams_passedCorrectly() {
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of());
+        org.mockito.ArgumentCaptor<Pageable> pageableCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        when(caseTypeRepository.findAll(any(Specification.class), pageableCaptor.capture()))
+                .thenReturn(mockPage);
+
+        CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
+        filter.setPage(1);
+        filter.setSize(5);
+        filter.setSortBy("name");
+        filter.setSortDir("asc");
+
+        caseTypeService.getAllCaseTypes(filter);
+
+        Pageable pageable = pageableCaptor.getValue();
+        assertEquals(1, pageable.getPageNumber());
+        assertEquals(5, pageable.getPageSize());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_sizeExceedsMax_cappedAt100() {
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of());
+        org.mockito.ArgumentCaptor<Pageable> pageableCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        when(caseTypeRepository.findAll(any(Specification.class), pageableCaptor.capture()))
+                .thenReturn(mockPage);
+
+        CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
+        filter.setSize(500);
+
+        caseTypeService.getAllCaseTypes(filter);
+
+        assertEquals(100, pageableCaptor.getValue().getPageSize());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_pageNegative_normalizedToZero() {
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of());
+        org.mockito.ArgumentCaptor<Pageable> pageableCaptor =
+                org.mockito.ArgumentCaptor.forClass(Pageable.class);
+        when(caseTypeRepository.findAll(any(Specification.class), pageableCaptor.capture()))
+                .thenReturn(mockPage);
+
+        CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
+        filter.setPage(-3);
+
+        caseTypeService.getAllCaseTypes(filter);
+
+        assertEquals(0, pageableCaptor.getValue().getPageNumber());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getAllCaseTypes_returnsCorrectPageMetadata() {
+        CaseTypeModel ct = buildCaseType(1L, "Bug", "desc", true);
+        Page<CaseTypeModel> mockPage = new PageImpl<>(List.of(ct),
+                org.springframework.data.domain.PageRequest.of(0, 10), 1L);
+        when(caseTypeRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
+        when(stageRepository.findByCaseTypeIdOrderByStageOrderAsc(1L)).thenReturn(List.of());
+
+        PagedResponseDTO<CaseTypeDTO> result = caseTypeService.getAllCaseTypes(new CaseTypeFilterDTO());
+
+        assertEquals(0, result.page());
+        assertEquals(10, result.size());
+        assertEquals(1L, result.totalElements());
+        assertEquals(1, result.totalPages());
+        assertTrue(result.last());
     }
 
     // ── getCaseTypeById ───────────────────────────────────────────────────────
