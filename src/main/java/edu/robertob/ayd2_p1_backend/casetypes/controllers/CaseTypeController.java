@@ -66,7 +66,7 @@ public class CaseTypeController {
             })
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('PROJECT_ADMIN', 'SYSTEM_ADMIN')")
     public PagedResponseDTO<CaseTypeDTO> getAllCaseTypes(@ModelAttribute CaseTypeFilterDTO filter) {
         return caseTypeService.getAllCaseTypes(filter);
     }
