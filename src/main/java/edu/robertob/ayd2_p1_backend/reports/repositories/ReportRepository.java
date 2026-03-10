@@ -105,10 +105,10 @@ public interface ReportRepository extends JpaRepository<CaseTicketModel, Long> {
             LEFT JOIN WorkLogModel wl ON wl.employee.id = e.id
             LEFT JOIN CaseStepModel cs ON cs.id = wl.caseStep.id
             LEFT JOIN CaseTicketModel ct ON ct.id = cs.caseTicket.id
-            WHERE (:search IS NULL
-                   OR LOWER(e.first_name) LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(e.last_name)  LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(u.username)   LIKE LOWER(CONCAT('%', :search, '%')))
+            WHERE (CAST(:search AS string) IS NULL
+                   OR LOWER(e.first_name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(e.last_name)  LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(u.username)   LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             GROUP BY e.id, e.first_name, e.last_name, u.username, e.hourly_rate
             ORDER BY e.last_name ASC, e.first_name ASC
             """)
@@ -134,7 +134,7 @@ public interface ReportRepository extends JpaRepository<CaseTicketModel, Long> {
             LEFT JOIN WorkLogModel wl ON wl.caseStep.id = cs.id
             LEFT JOIN EmployeeModel e ON e.id = wl.employee.id
             WHERE (:status IS NULL OR CAST(p.status AS string) = :status)
-              AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%')))
+              AND (CAST(:search AS string) IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             GROUP BY p.id, p.name, p.status
             ORDER BY p.name ASC
             """)
