@@ -14,6 +14,9 @@ public class AppProperties {
     @Value("${app.frontendHost}")
     private String frontendHost;
 
+    @Value("${app.allowedOrigins}")
+    private String allowedOrigins;
+
     @Value("${backend.host}")
     private String backendHost;
 

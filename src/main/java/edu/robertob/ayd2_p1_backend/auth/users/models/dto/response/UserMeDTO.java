@@ -5,6 +5,7 @@ public record UserMeDTO(
         String username,
         String email,
         boolean active,
+        boolean onboardingCompleted,
         UserDTO.RoleInfoDTO role,
         UserDTO.EmployeeDTO employee
 ) {}

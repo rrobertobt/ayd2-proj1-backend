@@ -6,6 +6,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -23,6 +24,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorDTO handleBadCredentials(BadCredentialsException ex) {
         return new ErrorDTO("Credenciales incorrectas");
+    }
+
+    /** 403 – acceso denegado */
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorDTO handleAccessDenied(AccessDeniedException ex) {
+        return new ErrorDTO("Acceso denegado");
     }
 
     /** 404 – recurso no encontrado */
@@ -55,6 +63,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidTokenException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorDTO handleInvalidToken(InvalidTokenException ex) {
+        return new ErrorDTO(ex.getMessage());
+    }
+
+    /** 400 – solicitud inválida (ej. validación de negocio) */
+    @ExceptionHandler(BadRequestException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorDTO handleBadRequest(BadRequestException ex) {
         return new ErrorDTO(ex.getMessage());
     }
 

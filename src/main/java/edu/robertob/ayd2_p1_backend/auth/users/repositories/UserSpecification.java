@@ -58,6 +58,25 @@ public final class UserSpecification {
                 ));
             }
 
+            // ── Employee full name (partial, case-insensitive) ───────────────
+            // Matches against "firstName lastName" and "lastName firstName" so
+            // the caller can supply names in any order.
+            if (StringUtils.hasText(filter.getFullName())) {
+                String pattern = likePattern(filter.getFullName());
+                Expression<String> firstLast = cb.lower(cb.concat(
+                        cb.concat(empJoin.get("first_name"), " "),
+                        empJoin.get("last_name")
+                ));
+                Expression<String> lastFirst = cb.lower(cb.concat(
+                        cb.concat(empJoin.get("last_name"), " "),
+                        empJoin.get("first_name")
+                ));
+                predicates.add(cb.or(
+                        cb.like(firstLast, pattern),
+                        cb.like(lastFirst, pattern)
+                ));
+            }
+
             // ── Exact email ──────────────────────────────────────────────────
             if (StringUtils.hasText(filter.getEmail())) {
                 predicates.add(cb.equal(
@@ -69,6 +88,11 @@ public final class UserSpecification {
             // ── Role ID ──────────────────────────────────────────────────────
             if (filter.getRoleId() != null) {
                 predicates.add(cb.equal(root.get("role").get("id"), filter.getRoleId()));
+            }
+
+            // ── Role Code ────────────────────────────────────────────────────
+            if (filter.getRoleCode() != null) {
+                predicates.add(cb.equal(root.get("role").get("code"), filter.getRoleCode()));
             }
 
             // ── Active status ────────────────────────────────────────────────

@@ -37,6 +37,7 @@ jobs:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
           FRONTEND_HOST: ${{ secrets.FRONTEND_HOST }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
           MAIL_HOST: ${{ secrets.MAIL_HOST }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
           MAIL_PROTOCOL: ${{ secrets.MAIL_PROTOCOL }}

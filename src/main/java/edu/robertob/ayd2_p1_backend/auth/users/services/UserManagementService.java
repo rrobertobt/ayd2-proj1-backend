@@ -16,6 +16,7 @@ import edu.robertob.ayd2_p1_backend.auth.users.repositories.OnboardingTokenRepos
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserRepository;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserSpecification;
 import edu.robertob.ayd2_p1_backend.core.config.AppProperties;
+import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.DuplicateResourceException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.InvalidTokenException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
@@ -32,10 +33,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import edu.robertob.ayd2_p1_backend.auth.users.enums.RolesEnum;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -90,9 +93,12 @@ public class UserManagementService {
         user.setUsername(dto.getUsername());
         user.setEmail(dto.getEmail());
         user.setRole(role);
-        user.setActive(true);
 
         boolean hasPassword = StringUtils.hasText(dto.getPassword());
+        // Users without a password start inactive until they complete onboarding
+        user.setActive(hasPassword);
+        // Users created with an explicit password are considered onboarded immediately
+        user.setOnboardingCompleted(hasPassword);
         if (hasPassword) {
             user.setPassword_hash(passwordEncoder.encode(dto.getPassword()));
         } else {
@@ -133,6 +139,30 @@ public class UserManagementService {
             "lastName",   "last_name",
             "hourlyRate", "hourly_rate"
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // READ  –  developers list (no pagination)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns all active DEVELOPER users, optionally filtered by full name.
+     *
+     * @param fullName optional partial match on "firstName lastName" or "lastName firstName"
+     * @return list of matching developers
+     */
+    @Transactional(readOnly = true)
+    public List<UserDTO> getDevelopers(String fullName) {
+        UserFilterDTO filter = new UserFilterDTO();
+        filter.setRoleCode(RolesEnum.DEVELOPER);
+        filter.setFullName(fullName);
+
+        return userRepository.findAll(UserSpecification.from(filter)).stream()
+                .map(u -> {
+                    EmployeeModel emp = employeeRepository.findByUserId(u.getId()).orElse(null);
+                    return userMapper.userToUserDTO(u, emp);
+                })
+                .toList();
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // READ  –  paginated + filtered list
@@ -245,14 +275,60 @@ public class UserManagementService {
 
     /**
      * Activates or deactivates a user account.
+     * Blocked when: the caller tries to toggle their own account, or when
+     * activation is attempted on a user who hasn't completed onboarding.
      */
-    public UserDTO toggleUserStatus(Long id) throws NotFoundException {
+    public UserDTO toggleUserStatus(Long id, String authenticatedUsername) throws NotFoundException {
+        UserModel authenticatedUser = userRepository.findUserByUsername(authenticatedUsername)
+                .orElseThrow(() -> new NotFoundException("No se encontró el usuario autenticado."));
+
+        if (authenticatedUser.getId().equals(id)) {
+            throw new BadRequestException(
+                    "No puedes activar o desactivar tu propia cuenta.");
+        }
+
         UserModel user = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("No se encontró un usuario con el ID: " + id));
+
+        // Prevent activating a user who hasn't completed onboarding
+        if (!user.isActive() && onboardingTokenRepository.existsByUserIdAndUsedFalse(id)) {
+            throw new BadRequestException(
+                    "El usuario no puede ser activado porque aún no ha completado el proceso de onboarding.");
+        }
+
         user.setActive(!user.isActive());
         UserModel saved = userRepository.save(user);
         EmployeeModel emp = employeeRepository.findByUserId(id).orElse(null);
         return userMapper.userToUserDTO(saved, emp);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // RESEND ONBOARDING EMAIL
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Resends the onboarding email to a user who has not yet completed the onboarding process.
+     * Deletes any existing (unused) tokens and issues a fresh one.
+     *
+     * @throws NotFoundException   if no user with the given ID exists
+     * @throws BadRequestException if the user is already active (onboarding already completed)
+     */
+    public void resendOnboardingEmail(Long userId) throws NotFoundException {
+        UserModel user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("No se encontró un usuario con el ID: " + userId));
+
+        if (user.isOnboardingCompleted()) {
+            throw new BadRequestException(
+                    "El usuario ya completó el proceso de onboarding.");
+        }
+
+        // Invalidate any existing tokens before issuing a new one
+        onboardingTokenRepository.deleteByUserId(userId);
+
+        EmployeeModel emp = employeeRepository.findByUserId(userId).orElse(null);
+        String firstName = emp != null ? emp.getFirst_name() : user.getUsername();
+
+        sendOnboardingEmail(user, firstName);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -281,6 +357,7 @@ public class UserManagementService {
         UserModel user = tokenModel.getUser();
         user.setPassword_hash(passwordEncoder.encode(dto.getPassword()));
         user.setActive(true);
+        user.setOnboardingCompleted(true);
         userRepository.save(user);
 
         // Mark token as used

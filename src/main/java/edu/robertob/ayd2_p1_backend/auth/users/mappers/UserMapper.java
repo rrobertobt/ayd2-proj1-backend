@@ -32,6 +32,7 @@ public class UserMapper {
                 user.getUsername(),
                 user.getEmail(),
                 user.isActive(),
+                user.isOnboardingCompleted(),
                 roleDTO,
                 employeeDTO
         );
@@ -43,6 +44,6 @@ public class UserMapper {
 
     public UserMeDTO userToUserMeDTO(UserModel user, EmployeeModel employee) {
         UserDTO full = userToUserDTO(user, employee);
-        return new UserMeDTO(full.id(), full.username(), full.email(), full.active(), full.role(), full.employee());
+        return new UserMeDTO(full.id(), full.username(), full.email(), full.active(), full.onboardingCompleted(), full.role(), full.employee());
     }
 }

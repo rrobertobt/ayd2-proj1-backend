@@ -1,5 +1,6 @@
 package edu.robertob.ayd2_p1_backend.auth.users.models.dto.request;
 
+import edu.robertob.ayd2_p1_backend.auth.users.enums.RolesEnum;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.data.domain.Sort;
@@ -21,11 +22,17 @@ public class UserFilterDTO {
     /** Filter by employee last name (case-insensitive, partial match). */
     private String lastName;
 
+    /** Filter by employee full name (case-insensitive, partial match on "firstName lastName" or "lastName firstName"). */
+    private String fullName;
+
     /** Filter by exact user email. */
     private String email;
 
     /** Filter by role ID. */
     private Long roleId;
+
+    /** Filter by role code enum (e.g. SYSTEM_ADMIN, PROJECT_ADMIN, DEVELOPER). */
+    private RolesEnum roleCode;
 
     /** Filter by active/inactive status. */
     private Boolean active;

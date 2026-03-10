@@ -1,5 +1,6 @@
 package edu.robertob.ayd2_p1_backend.auth.users.controllers;
 
+import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.ChangePasswordDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.CreateUserDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.SetPasswordDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.UpdateUserDTO;
@@ -11,6 +12,7 @@ import edu.robertob.ayd2_p1_backend.auth.users.services.UserService;
 import edu.robertob.ayd2_p1_backend.core.exceptions.InvalidTokenException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
+import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -52,6 +54,28 @@ public class UserController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PATCH /me/password  – change own password (any authenticated user)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Operation(
+            summary = "Cambiar contraseña del usuario autenticado",
+            description = "Permite al usuario autenticado cambiar su propia contraseña. "
+                    + "Requiere proporcionar la contraseña actual para confirmar la identidad.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "Contraseña actualizada exitosamente"),
+                    @ApiResponse(responseCode = "400", description = "Contraseña actual incorrecta o confirmación no coincide"),
+                    @ApiResponse(responseCode = "401", description = "Token inválido o no proporcionado")
+            })
+    @PatchMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid ChangePasswordDTO dto) throws NotFoundException {
+        userService.changePassword(userDetails.getUsername(), dto);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // PUBLIC – onboarding set-password (no auth required)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -70,6 +94,32 @@ public class UserController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PROJECT_ADMIN – developers lookup for case-step assignment
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Operation(
+            summary = "Listar developers",
+            description = """
+                    Devuelve todos los usuarios con rol DEVELOPER. Accesible para PROJECT_ADMIN.
+
+                    **Filtro disponible (query param):**
+                    - `fullName` – búsqueda parcial en nombre completo ("nombre apellido" o "apellido nombre")
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lista de developers"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @GetMapping("/developers")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('PROJECT_ADMIN')")
+    public List<UserDTO> getDevelopers(
+            @Parameter(description = "Búsqueda parcial por nombre completo")
+            @RequestParam(required = false) String fullName) {
+        return userManagementService.getDevelopers(fullName);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // ADMIN – user management (SYSTEM_ADMIN only)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -82,8 +132,10 @@ public class UserController {
                     - `search` – búsqueda parcial en username y email
                     - `firstName` – búsqueda parcial en nombre del empleado
                     - `lastName` – búsqueda parcial en apellido del empleado
+                    - `fullName` – búsqueda parcial en nombre completo ("nombre apellido" o "apellido nombre")
                     - `email` – email exacto
                     - `roleId` – ID del rol
+                    - `roleCode` – código del rol: `SYSTEM_ADMIN` | `PROJECT_ADMIN` | `DEVELOPER`
                     - `active` – true / false
 
                     **Paginación:**
@@ -171,7 +223,26 @@ public class UserController {
     @PatchMapping("/{userId}/toggle-status")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('SYSTEM_ADMIN')")
-    public UserDTO toggleUserStatus(@PathVariable Long userId) throws NotFoundException {
-        return userManagementService.toggleUserStatus(userId);
+    public UserDTO toggleUserStatus(@PathVariable Long userId,
+                                    @AuthenticationPrincipal UserDetails userDetails) throws NotFoundException {
+        return userManagementService.toggleUserStatus(userId, userDetails.getUsername());
+    }
+
+    @Operation(
+            summary = "Reenviar correo de onboarding",
+            description = "Reenvía el correo de onboarding a un usuario inactivo que no ha completado el proceso. " +
+                    "Invalida cualquier token anterior y genera uno nuevo. Solo accesible para SYSTEM_ADMIN.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "Correo reenviado exitosamente"),
+                    @ApiResponse(responseCode = "400", description = "El usuario ya completó el onboarding y está activo"),
+                    @ApiResponse(responseCode = "404", description = "Usuario no encontrado"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @PostMapping("/{userId}/onboarding/resend")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    public void resendOnboardingEmail(@PathVariable Long userId) throws NotFoundException {
+        userManagementService.resendOnboardingEmail(userId);
     }
 }

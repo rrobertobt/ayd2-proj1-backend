@@ -86,7 +86,7 @@ class UserServiceTest {
         EmployeeModel employee = buildEmployee(4L, user);
         UserDTO.RoleInfoDTO roleDTO = new UserDTO.RoleInfoDTO(3L, "PROJECT_ADMIN", "Project Admin");
         UserDTO.EmployeeDTO empDTO = new UserDTO.EmployeeDTO(4L, "Sara", "Lopez", 25.0);
-        UserDTO dto = new UserDTO(9L, "sara", "sara@mail.com", true, roleDTO, empDTO);
+        UserDTO dto = new UserDTO(9L, "sara", "sara@mail.com", true, true, roleDTO, empDTO);
 
         when(userRepository.findUserByUsername("sara")).thenReturn(Optional.of(user));
         when(employeeRepository.findByUserId(9L)).thenReturn(Optional.of(employee));
@@ -116,7 +116,7 @@ class UserServiceTest {
         EmployeeModel employee = buildEmployee(5L, user);
         UserDTO.RoleInfoDTO roleDTO = new UserDTO.RoleInfoDTO(3L, "DEVELOPER", "Developer");
         UserDTO.EmployeeDTO empDTO = new UserDTO.EmployeeDTO(5L, "Bob", "Smith", 30.0);
-        UserMeDTO meDTO = new UserMeDTO(10L, "bob", "bob@mail.com", true, roleDTO, empDTO);
+        UserMeDTO meDTO = new UserMeDTO(10L, "bob", "bob@mail.com", true, true, roleDTO, empDTO);
 
         when(userRepository.findUserByUsername("bob")).thenReturn(Optional.of(user));
         when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
