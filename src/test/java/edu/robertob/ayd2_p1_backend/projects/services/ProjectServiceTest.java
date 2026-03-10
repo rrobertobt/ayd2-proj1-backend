@@ -18,7 +18,10 @@ import edu.robertob.ayd2_p1_backend.projects.models.dto.response.ProjectDTO;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectAdminAssignmentModel;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectAdminAssignmentRepository;
+import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +32,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.Instant;
 import java.util.List;
@@ -43,11 +49,26 @@ class ProjectServiceTest {
 
     @Mock private ProjectRepository projectRepository;
     @Mock private ProjectAdminAssignmentRepository assignmentRepository;
+    @Mock private ProjectMemberRepository projectMemberRepository;
     @Mock private UserRepository userRepository;
     @Mock private EmployeeRepository employeeRepository;
 
     @InjectMocks
     private ProjectService projectService;
+
+    @BeforeEach
+    void setUpSecurityContext() {
+        // Default: SYSTEM_ADMIN — bypasses PROJECT_ADMIN-specific checks
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin", null,
+                        List.of(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"))));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
 
     // ── createProject ─────────────────────────────────────────────────────────
 
@@ -443,6 +464,8 @@ class ProjectServiceTest {
         when(userRepository.findById(20L)).thenReturn(Optional.of(user));
         when(employeeRepository.findByUserId(20L)).thenReturn(Optional.of(employee));
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(existingAssignment));
+        when(assignmentRepository.saveAndFlush(any(ProjectAdminAssignmentModel.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
         when(assignmentRepository.save(any(ProjectAdminAssignmentModel.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -450,7 +473,8 @@ class ProjectServiceTest {
 
         assertFalse(existingAssignment.isActive());
         assertNotNull(existingAssignment.getEndDate());
-        verify(assignmentRepository, times(2)).save(any(ProjectAdminAssignmentModel.class));
+        verify(assignmentRepository).saveAndFlush(any(ProjectAdminAssignmentModel.class));
+        verify(assignmentRepository).save(any(ProjectAdminAssignmentModel.class));
     }
 
     @Test
