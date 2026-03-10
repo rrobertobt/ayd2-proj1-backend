@@ -11,7 +11,7 @@ BEGIN;
 CREATE TABLE roles
 (
     id          BIGSERIAL PRIMARY KEY,
-    code        VARCHAR(50)  NOT NULL UNIQUE, -- SYSTEM_ADMIN, PROJECT_ADMIN, DEVELOPER
+    code        VARCHAR(50)  NOT NULL UNIQUE,
     name        VARCHAR(100) NOT NULL,
     description TEXT,
     active      BOOLEAN      NOT NULL DEFAULT TRUE,
@@ -34,7 +34,7 @@ CREATE TABLE users
 CREATE TABLE employees
 (
     id          BIGSERIAL PRIMARY KEY,
-    user_id     BIGINT UNIQUE REFERENCES users (id), -- 1-1 (opcional, pero único si existe)
+    user_id     BIGINT UNIQUE REFERENCES users (id),
     first_name  VARCHAR(120)   NOT NULL,
     last_name   VARCHAR(120)   NOT NULL,
     hourly_rate NUMERIC(12, 2) NOT NULL DEFAULT 0,
@@ -53,7 +53,7 @@ CREATE TABLE projects
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(200) NOT NULL,
     description TEXT,
-    status      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE', : ACTIVE/INACTIVE
+    status      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT project_status_chk CHECK (status IN ('ACTIVE', 'INACTIVE'))
@@ -160,7 +160,7 @@ CREATE TABLE case_steps
         )
 );
 
--- Un paso por orden por caso
+-- Un paso por orden por caso (Postgres partial unique index)
 CREATE UNIQUE INDEX uq_case_step_order
     ON case_steps (case_id, step_order);
 
@@ -184,7 +184,7 @@ CREATE TABLE work_logs
 CREATE TABLE audit_logs
 (
     id                   BIGSERIAL PRIMARY KEY,
-    entity_type          VARCHAR(40) NOT NULL, -- PROJECT, CASE, CASE_STEP, etc.
+    entity_type          VARCHAR(40) NOT NULL,
     entity_id            BIGINT      NOT NULL,
     action               VARCHAR(60) NOT NULL,
     performed_by_user_id BIGINT REFERENCES users (id),
@@ -193,36 +193,25 @@ CREATE TABLE audit_logs
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
--- Índices recomendados (performance)
--- ============================================================
 
--- Consultas típicas:
--- 1) Admin ve casos por proyecto, por estado, por fecha límite
 CREATE INDEX idx_case_ticket_project_status_due
     ON case_tickets (project_id, status, due_date);
 
--- 2) Dashboard de vencidos/próximos a vencer (por proyecto)
 CREATE INDEX idx_case_ticket_project_due
     ON case_tickets (project_id, due_date);
 
--- 3) "Mis casos": steps asignados a un empleado y su estado
 CREATE INDEX idx_case_step_assigned_status
     ON case_steps (assigned_employee_id, status);
 
--- 4) Encontrar steps de un caso rápidamente (para progreso/flujo)
 CREATE INDEX idx_case_step_case
     ON case_steps (case_id);
 
--- 5) WorkLogs por empleado y rango de fechas (reportes)
 CREATE INDEX idx_work_log_employee_created
     ON work_logs (employee_id, created_at);
 
--- 6) WorkLogs por step (detalle de paso / auditoría)
 CREATE INDEX idx_work_log_step
     ON work_logs (case_step_id);
 
--- 8) Auditoría por entidad
 CREATE INDEX idx_audit_entity
     ON audit_logs (entity_type, entity_id, created_at);
 

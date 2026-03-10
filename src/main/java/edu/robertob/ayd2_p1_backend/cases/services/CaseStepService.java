@@ -115,6 +115,11 @@ public class CaseStepService {
                     "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
         }
 
+        if (!workLogRepository.existsByCaseStepId(stepId)) {
+            throw new BadRequestException(
+                    "No se puede aprobar un paso sin que el desarrollador haya registrado al menos un worklog.");
+        }
+
         if (step.getStatus() != CaseStepStatusEnum.SUBMITTED &&
                 step.getStatus() != CaseStepStatusEnum.IN_PROGRESS &&
                 step.getStatus() != CaseStepStatusEnum.ASSIGNED) {
@@ -166,6 +171,11 @@ public class CaseStepService {
         if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
             throw new BadRequestException(
                     "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
+
+        if (!workLogRepository.existsByCaseStepId(stepId)) {
+            throw new BadRequestException(
+                    "No se puede rechazar un paso sin que el desarrollador haya registrado al menos un worklog.");
         }
 
         if (step.getStatus() != CaseStepStatusEnum.SUBMITTED &&

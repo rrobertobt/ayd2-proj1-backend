@@ -10,4 +10,6 @@ import java.util.List;
 public interface WorkLogRepository extends JpaRepository<WorkLogModel, Long> {
 
     List<WorkLogModel> findByCaseStepIdOrderByCreatedAtAsc(Long caseStepId);
+
+    boolean existsByCaseStepId(Long caseStepId);
 }
