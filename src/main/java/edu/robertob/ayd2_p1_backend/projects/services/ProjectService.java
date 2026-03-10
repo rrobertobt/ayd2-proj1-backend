@@ -17,6 +17,7 @@ import edu.robertob.ayd2_p1_backend.projects.models.dto.response.ProjectDTO;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectAdminAssignmentModel;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectAdminAssignmentRepository;
+import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectSpecification;
 import lombok.RequiredArgsConstructor;
@@ -25,11 +26,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -48,6 +53,7 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectAdminAssignmentRepository assignmentRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
 
@@ -113,7 +119,48 @@ public class ProjectService {
         ProjectModel project = findProjectById(id);
         Optional<ProjectAdminAssignmentModel> assignment =
                 assignmentRepository.findByProjectIdAndActiveTrue(id);
+
+        // PROJECT_ADMIN can only see projects they are assigned to
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isProjectAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PROJECT_ADMIN"));
+        if (isProjectAdmin) {
+            EmployeeModel caller = employeeRepository.findByUserUsername(auth.getName())
+                    .orElseThrow(() -> new BadRequestException("El usuario no tiene perfil de empleado"));
+            if (assignment.isEmpty() ||
+                    !assignment.get().getEmployee().getId().equals(caller.getId())) {
+                throw new AccessDeniedException("No tiene acceso a este proyecto");
+            }
+        }
+
         return toDTO(project, assignment.orElse(null));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProjectDTO> getMyProjects() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        EmployeeModel employee = employeeRepository.findByUserUsername(auth.getName())
+                .orElseThrow(() -> new BadRequestException("El usuario no tiene perfil de empleado"));
+
+        boolean isProjectAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PROJECT_ADMIN"));
+
+        List<ProjectModel> projects;
+        if (isProjectAdmin) {
+            projects = assignmentRepository.findByEmployeeIdAndActiveTrue(employee.getId())
+                    .stream().map(ProjectAdminAssignmentModel::getProject).toList();
+        } else {
+            projects = projectMemberRepository.findByEmployeeIdAndActiveTrue(employee.getId())
+                    .stream().map(a -> a.getProject()).toList();
+        }
+
+        return projects.stream()
+                .map(p -> {
+                    Optional<ProjectAdminAssignmentModel> admin =
+                            assignmentRepository.findByProjectIdAndActiveTrue(p.getId());
+                    return toDTO(p, admin.orElse(null));
+                })
+                .toList();
     }
 
     // ─────────────────────────────────────────────────────────────────────────

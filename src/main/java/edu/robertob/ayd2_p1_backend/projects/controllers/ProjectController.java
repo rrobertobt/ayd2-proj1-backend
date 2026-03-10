@@ -17,6 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/projects")
 @RequiredArgsConstructor
@@ -70,7 +72,8 @@ public class ProjectController {
 
     @Operation(
             summary = "Ver detalle de proyecto",
-            description = "Devuelve el detalle de un proyecto por su ID. Solo accesible para SYSTEM_ADMIN.",
+            description = "Devuelve el detalle de un proyecto por su ID. " +
+                    "SYSTEM_ADMIN puede ver cualquier proyecto; PROJECT_ADMIN solo puede ver proyectos donde está asignado.",
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Proyecto encontrado"),
@@ -79,9 +82,28 @@ public class ProjectController {
             })
     @GetMapping("/{projectId}")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'PROJECT_ADMIN')")
     public ProjectDTO getProjectById(@PathVariable Long projectId) throws NotFoundException {
         return projectService.getProjectById(projectId);
+    }
+
+    @Operation(
+            summary = "Mis proyectos",
+            description = """
+                    Devuelve los proyectos asociados al usuario autenticado.
+                    - PROJECT_ADMIN: proyectos donde está asignado como administrador activo.
+                    - DEVELOPER: proyectos donde es miembro activo.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lista de proyectos propios"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @GetMapping("/my")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('PROJECT_ADMIN', 'DEVELOPER')")
+    public List<ProjectDTO> getMyProjects() {
+        return projectService.getMyProjects();
     }
 
     @Operation(
