@@ -283,6 +283,90 @@ class CaseStepServiceTest {
                 () -> caseStepService.assignStep(1L, 200L, dto));
     }
 
+    @Test
+    void assignStep_previousStepNotApproved_throwsBadRequestException() {
+        ProjectModel project = buildProject(1L, "P");
+        CaseTypeModel caseType = buildCaseType(2L, "Bug");
+        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
+        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
+                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
+        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
+        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
+        // Step 1 is still IN_PROGRESS (not APPROVED)
+        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.IN_PROGRESS);
+        // Trying to assign step 2 while step 1 is not approved
+        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
+
+        AssignStepDTO dto = new AssignStepDTO();
+        dto.setUserId(45L);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
+                .thenReturn(List.of(step1, step2));
+
+        assertThrows(BadRequestException.class,
+                () -> caseStepService.assignStep(1L, 201L, dto));
+        verify(caseStepRepository, never()).save(any());
+    }
+
+    @Test
+    void assignStep_previousStepPending_throwsBadRequestException() {
+        ProjectModel project = buildProject(1L, "P");
+        CaseTypeModel caseType = buildCaseType(2L, "Bug");
+        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
+        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
+                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
+        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
+        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
+        // Step 1 is still PENDING (no developer assigned yet)
+        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.PENDING);
+        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
+
+        AssignStepDTO dto = new AssignStepDTO();
+        dto.setUserId(45L);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
+                .thenReturn(List.of(step1, step2));
+
+        assertThrows(BadRequestException.class,
+                () -> caseStepService.assignStep(1L, 201L, dto));
+        verify(caseStepRepository, never()).save(any());
+    }
+
+    @Test
+    void assignStep_allPreviousStepsApproved_assignsSuccessfully() throws Exception {
+        ProjectModel project = buildProject(1L, "P");
+        CaseTypeModel caseType = buildCaseType(2L, "Bug");
+        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
+        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
+        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
+                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
+        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
+        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
+        // Step 1 is APPROVED — step 2 can now be assigned
+        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.APPROVED);
+        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
+
+        AssignStepDTO dto = new AssignStepDTO();
+        dto.setUserId(45L);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
+                .thenReturn(List.of(step1, step2));
+        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
+        when(caseStepRepository.save(step2)).thenReturn(step2);
+
+        CaseStepDTO result = caseStepService.assignStep(1L, 201L, dto);
+
+        assertNotNull(result);
+        assertEquals("ASSIGNED", result.status());
+        assertEquals(CaseStepStatusEnum.ASSIGNED, step2.getStatus());
+    }
+
     // ── approveStep ───────────────────────────────────────────────────────────
 
     @Test

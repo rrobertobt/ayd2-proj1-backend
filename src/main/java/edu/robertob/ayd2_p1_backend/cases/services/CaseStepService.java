@@ -70,6 +70,17 @@ public class CaseStepService {
             throw new BadRequestException("El paso ya fue aprobado y no puede ser reasignado.");
         }
 
+        // Validate that all previous steps in the workflow have been APPROVED first
+        List<CaseStepModel> allSteps =
+                caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(caseId);
+        boolean hasPendingPreviousStep = allSteps.stream()
+                .filter(s -> s.getStepOrder() < step.getStepOrder())
+                .anyMatch(s -> s.getStatus() != CaseStepStatusEnum.APPROVED);
+        if (hasPendingPreviousStep) {
+            throw new BadRequestException(
+                    "No se puede asignar este paso porque hay pasos anteriores que aún no han sido aprobados.");
+        }
+
         EmployeeModel employee = findEmployeeByUserId(dto.getUserId());
 
         step.setAssignedEmployee(employee);
