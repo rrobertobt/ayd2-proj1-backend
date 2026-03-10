@@ -198,6 +198,11 @@ public class ProjectService {
     public ProjectDTO assignAdmin(Long projectId, AssignProjectAdminDTO dto) throws NotFoundException {
         ProjectModel project = findProjectById(projectId);
 
+        if (project.getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "No se puede asignar un administrador a un proyecto inactivo");
+        }
+
         UserModel user = userRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new NotFoundException(
                         "No se encontró un usuario con el ID: " + dto.getUserId()));

@@ -108,32 +108,34 @@ class CaseControllerTest {
 
     @Test
     void getCasesByProject_delegatesToService() throws Exception {
-        List<CaseSummaryDTO> expected = List.of(
-                buildSummaryDTO(1L, "T1"),
-                buildSummaryDTO(2L, "T2")
-        );
-        when(caseService.getCasesByProject(1L)).thenReturn(expected);
+        CaseFilterDTO filter = new CaseFilterDTO();
+        PagedResponseDTO<CaseSummaryDTO> expected = new PagedResponseDTO<>(
+                List.of(buildSummaryDTO(1L, "T1"), buildSummaryDTO(2L, "T2")), 0, 10, 2L, 1, true);
+        when(caseService.getCasesByProject(1L, filter)).thenReturn(expected);
 
-        List<CaseSummaryDTO> result = caseController.getCasesByProject(1L);
+        PagedResponseDTO<CaseSummaryDTO> result = caseController.getCasesByProject(1L, filter);
 
         assertSame(expected, result);
-        verify(caseService).getCasesByProject(1L);
+        verify(caseService).getCasesByProject(1L, filter);
     }
 
     @Test
     void getCasesByProject_propagatesNotFoundException() throws Exception {
-        when(caseService.getCasesByProject(99L)).thenThrow(new NotFoundException("Not found"));
+        CaseFilterDTO filter = new CaseFilterDTO();
+        when(caseService.getCasesByProject(99L, filter)).thenThrow(new NotFoundException("Not found"));
 
-        assertThrows(NotFoundException.class, () -> caseController.getCasesByProject(99L));
+        assertThrows(NotFoundException.class, () -> caseController.getCasesByProject(99L, filter));
     }
 
     @Test
-    void getCasesByProject_emptyProject_returnsEmptyList() throws Exception {
-        when(caseService.getCasesByProject(1L)).thenReturn(List.of());
+    void getCasesByProject_emptyProject_returnsEmptyPage() throws Exception {
+        CaseFilterDTO filter = new CaseFilterDTO();
+        PagedResponseDTO<CaseSummaryDTO> expected = new PagedResponseDTO<>(List.of(), 0, 10, 0L, 0, true);
+        when(caseService.getCasesByProject(1L, filter)).thenReturn(expected);
 
-        List<CaseSummaryDTO> result = caseController.getCasesByProject(1L);
+        PagedResponseDTO<CaseSummaryDTO> result = caseController.getCasesByProject(1L, filter);
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.content().isEmpty());
     }
 
     // ── getCaseById ───────────────────────────────────────────────────────────

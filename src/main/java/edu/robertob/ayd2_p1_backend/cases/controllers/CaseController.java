@@ -74,20 +74,34 @@ public class CaseController {
     }
 
     @Operation(
-            summary = "Listar casos de un proyecto",
-            description = "Devuelve todos los casos de un proyecto con estado, progreso y alerta de vencimiento. " +
-                    "Accesible para PROJECT_ADMIN y SYSTEM_ADMIN.",
+            summary = "Listar casos de un proyecto (paginado y filtrado)",
+            description = """
+                    Devuelve una página de casos de un proyecto. Accesible para PROJECT_ADMIN y SYSTEM_ADMIN.
+
+                    **Filtros disponibles (query params):**
+                    - `caseTypeId` – filtrar por tipo de caso
+                    - `status` – estado del caso: `OPEN` | `IN_PROGRESS` | `COMPLETED` | `CANCELED`
+
+                    **Paginación:**
+                    - `page` – número de página (inicia en 0, default: 0)
+                    - `size` – tamaño de página (default: 10, máximo: 100)
+                    - `sortBy` – campo de ordenamiento: `title` | `status` | `dueDate` | `createdAt` (default: `createdAt`)
+                    - `sortDir` – dirección: `asc` | `desc` (default: `desc`)
+                    """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Lista de casos del proyecto"),
+                    @ApiResponse(responseCode = "200", description = "Página de casos del proyecto"),
+                    @ApiResponse(responseCode = "400", description = "Estado inválido"),
                     @ApiResponse(responseCode = "404", description = "Proyecto no encontrado"),
                     @ApiResponse(responseCode = "403", description = "Acceso denegado")
             })
     @GetMapping("/api/v1/projects/{projectId}/cases")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('PROJECT_ADMIN', 'SYSTEM_ADMIN')")
-    public List<CaseSummaryDTO> getCasesByProject(@PathVariable Long projectId) throws NotFoundException {
-        return caseService.getCasesByProject(projectId);
+    public PagedResponseDTO<CaseSummaryDTO> getCasesByProject(
+            @PathVariable Long projectId,
+            @ModelAttribute CaseFilterDTO filter) throws NotFoundException {
+        return caseService.getCasesByProject(projectId, filter);
     }
 
     @Operation(

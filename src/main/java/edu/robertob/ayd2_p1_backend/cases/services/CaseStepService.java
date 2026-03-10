@@ -18,6 +18,7 @@ import edu.robertob.ayd2_p1_backend.cases.repositories.CaseTicketRepository;
 import edu.robertob.ayd2_p1_backend.cases.repositories.WorkLogRepository;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
+import edu.robertob.ayd2_p1_backend.projects.enums.ProjectStatusEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -59,6 +60,11 @@ public class CaseStepService {
     public CaseStepDTO assignStep(Long caseId, Long stepId, AssignStepDTO dto) throws NotFoundException {
         CaseTicketModel ticket = findCaseById(caseId);
         CaseStepModel step = findStepByCaseAndId(caseId, stepId);
+
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
 
         if (ticket.getStatus() == CaseStatusEnum.CANCELED ||
                 ticket.getStatus() == CaseStatusEnum.COMPLETED) {
@@ -103,6 +109,11 @@ public class CaseStepService {
     public CaseStepDTO approveStep(Long caseId, Long stepId, ApproveStepDTO dto) throws NotFoundException {
         CaseTicketModel ticket = findCaseById(caseId);
         CaseStepModel step = findStepByCaseAndId(caseId, stepId);
+
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
 
         if (step.getStatus() != CaseStepStatusEnum.SUBMITTED &&
                 step.getStatus() != CaseStepStatusEnum.IN_PROGRESS &&
@@ -149,8 +160,13 @@ public class CaseStepService {
     // ─────────────────────────────────────────────────────────────────────────
 
     public CaseStepDTO rejectStep(Long caseId, Long stepId, RejectStepDTO dto) throws NotFoundException {
-        findCaseById(caseId);
+        CaseTicketModel ticket = findCaseById(caseId);
         CaseStepModel step = findStepByCaseAndId(caseId, stepId);
+
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
 
         if (step.getStatus() != CaseStepStatusEnum.SUBMITTED &&
                 step.getStatus() != CaseStepStatusEnum.IN_PROGRESS &&
@@ -205,6 +221,11 @@ public class CaseStepService {
     public WorklogDTO createWorklog(Long caseId, Long stepId, CreateWorklogDTO dto)
             throws NotFoundException {
         CaseTicketModel ticket = findCaseById(caseId);
+
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
 
         if (ticket.getStatus() == CaseStatusEnum.CANCELED ||
                 ticket.getStatus() == CaseStatusEnum.COMPLETED) {

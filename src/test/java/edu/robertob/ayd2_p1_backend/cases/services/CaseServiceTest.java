@@ -329,6 +329,7 @@ class CaseServiceTest {
     // ── getCasesByProject ─────────────────────────────────────────────────────
 
     @Test
+    @SuppressWarnings("unchecked")
     void getCasesByProject_returnsTicketsForProject() throws Exception {
         ProjectModel project = buildProject(1L, "P");
         CaseTypeModel caseType = buildCaseType(2L, "Bug");
@@ -339,32 +340,35 @@ class CaseServiceTest {
                 "T2", CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(3));
 
         when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(caseTicketRepository.findByProjectId(1L)).thenReturn(List.of(t1, t2));
+        when(caseTicketRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(t1, t2)));
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(anyLong())).thenReturn(List.of());
 
-        List<CaseSummaryDTO> result = caseService.getCasesByProject(1L);
+        PagedResponseDTO<CaseSummaryDTO> result = caseService.getCasesByProject(1L, new CaseFilterDTO());
 
-        assertEquals(2, result.size());
-        assertEquals("T1", result.get(0).title());
-        assertEquals("T2", result.get(1).title());
+        assertEquals(2, result.content().size());
+        assertEquals("T1", result.content().get(0).title());
+        assertEquals("T2", result.content().get(1).title());
     }
 
     @Test
     void getCasesByProject_projectNotFound_throwsNotFoundException() throws Exception {
         when(projectRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class, () -> caseService.getCasesByProject(99L));
-        verify(caseTicketRepository, never()).findByProjectId(any());
+        assertThrows(NotFoundException.class, () -> caseService.getCasesByProject(99L, new CaseFilterDTO()));
+        verify(caseTicketRepository, never()).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test
-    void getCasesByProject_noCases_returnsEmptyList() throws Exception {
+    @SuppressWarnings("unchecked")
+    void getCasesByProject_noCases_returnsEmptyPage() throws Exception {
         when(projectRepository.findById(1L)).thenReturn(Optional.of(buildProject(1L, "P")));
-        when(caseTicketRepository.findByProjectId(1L)).thenReturn(List.of());
+        when(caseTicketRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
 
-        List<CaseSummaryDTO> result = caseService.getCasesByProject(1L);
+        PagedResponseDTO<CaseSummaryDTO> result = caseService.getCasesByProject(1L, new CaseFilterDTO());
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.content().isEmpty());
     }
 
     // ── getCaseById ───────────────────────────────────────────────────────────

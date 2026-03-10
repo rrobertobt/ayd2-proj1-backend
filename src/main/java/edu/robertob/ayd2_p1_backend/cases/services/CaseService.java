@@ -23,6 +23,7 @@ import edu.robertob.ayd2_p1_backend.casetypes.repositories.CaseTypeStageReposito
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
+import edu.robertob.ayd2_p1_backend.projects.enums.ProjectStatusEnum;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectAdminAssignmentRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
@@ -71,6 +72,12 @@ public class CaseService {
 
     public CaseDTO createCase(CreateCaseDTO dto) throws NotFoundException {
         ProjectModel project = findProjectById(dto.getProjectId());
+
+        if (project.getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "No se pueden crear casos en un proyecto inactivo.");
+        }
+
         CaseTypeModel caseType = findCaseTypeById(dto.getCaseTypeId());
         EmployeeModel createdBy = resolveCurrentEmployee();
 
@@ -79,8 +86,7 @@ public class CaseService {
 
         if (stages.isEmpty()) {
             throw new BadRequestException(
-                    "El tipo de caso con ID " + dto.getCaseTypeId() +
-                    " no tiene etapas definidas. No se puede crear el caso.");
+                    "El tipo de caso seleccionado no tiene etapas definidas. No se puede crear el caso.");
         }
 
         CaseTicketModel ticket = new CaseTicketModel();
@@ -157,17 +163,48 @@ public class CaseService {
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<CaseSummaryDTO> getCasesByProject(Long projectId) throws NotFoundException {
+    public PagedResponseDTO<CaseSummaryDTO> getCasesByProject(Long projectId, CaseFilterDTO filter)
+            throws NotFoundException {
         findProjectById(projectId);
 
-        List<CaseTicketModel> tickets = caseTicketRepository.findByProjectId(projectId);
-        return tickets.stream()
+        if (filter.getStatus() != null && !filter.getStatus().isBlank()) {
+            try {
+                CaseStatusEnum.valueOf(filter.getStatus().toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                throw new BadRequestException("Estado de caso inválido: " + filter.getStatus() +
+                        ". Valores permitidos: OPEN, IN_PROGRESS, COMPLETED, CANCELED");
+            }
+        }
+
+        filter.setProjectId(projectId);
+
+        String sortField = SORT_FIELD_MAP.getOrDefault(filter.getSortBy(), "createdAt");
+        Sort sort = Sort.by(filter.direction(), sortField);
+        Pageable pageable = PageRequest.of(
+                Math.max(filter.getPage(), 0),
+                Math.min(Math.max(filter.getSize(), 1), 100),
+                sort
+        );
+
+        Page<CaseTicketModel> page = caseTicketRepository.findAll(
+                CaseTicketSpecification.from(filter), pageable);
+
+        var content = page.getContent().stream()
                 .map(ticket -> {
                     List<CaseStepModel> steps =
                             caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(ticket.getId());
                     return toSummaryDTO(ticket, steps);
                 })
                 .toList();
+
+        return new PagedResponseDTO<>(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isLast()
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -274,6 +311,11 @@ public class CaseService {
     public CaseDTO updateDueDate(Long caseId, UpdateDueDateDTO dto) throws NotFoundException {
         CaseTicketModel ticket = findCaseById(caseId);
 
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
+
         if (ticket.getStatus() == CaseStatusEnum.CANCELED ||
                 ticket.getStatus() == CaseStatusEnum.COMPLETED) {
             throw new BadRequestException(
@@ -293,6 +335,11 @@ public class CaseService {
 
     public CaseDTO cancelCase(Long caseId, CancelCaseDTO dto) throws NotFoundException {
         CaseTicketModel ticket = findCaseById(caseId);
+
+        if (ticket.getProject().getStatus() == ProjectStatusEnum.INACTIVE) {
+            throw new BadRequestException(
+                    "El proyecto asociado a este caso está inactivo. No se pueden realizar operaciones sobre sus casos.");
+        }
 
         if (ticket.getStatus() == CaseStatusEnum.CANCELED) {
             throw new BadRequestException("El caso ya está cancelado.");
