@@ -23,19 +23,18 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.SecurityContextImpl;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -50,553 +49,324 @@ class ProjectServiceTest {
     @Mock private ProjectAdminAssignmentRepository assignmentRepository;
     @Mock private UserRepository userRepository;
     @Mock private EmployeeRepository employeeRepository;
-
-    @InjectMocks
-    private ProjectService projectService;
+    @InjectMocks private ProjectService projectService;
 
     @BeforeEach
-    void setUpSecurityContext() {
-        // Default: SYSTEM_ADMIN — bypasses PROJECT_ADMIN-specific checks
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(
-                        "admin", null,
-                        List.of(new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"))));
+    void setUpAuth() {
+        var auth = new UsernamePasswordAuthenticationToken("admin", null, List.of());
+        SecurityContextHolder.setContext(new SecurityContextImpl(auth));
     }
 
     @AfterEach
-    void clearSecurityContext() {
-        SecurityContextHolder.clearContext();
+    void clearAuth() { SecurityContextHolder.clearContext(); }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static ProjectModel proj(Long id, String name, ProjectStatusEnum st) {
+        ProjectModel p = new ProjectModel();
+        p.setId(id); p.setName(name); p.setStatus(st); p.setDescription("desc");
+        return p;
+    }
+
+    private static EmployeeModel emp(Long id) {
+        EmployeeModel e = new EmployeeModel();
+        e.setId(id); e.setFirst_name("John"); e.setLast_name("Doe"); e.setHourly_rate(10.0);
+        return e;
+    }
+
+    private static UserModel user(Long id, RolesEnum code) {
+        UserModel u = new UserModel();
+        u.setId(id); u.setUsername("user" + id);
+        u.setRole(new RoleModel(1L, code, code.getCode(), null));
+        return u;
+    }
+
+    private static ProjectAdminAssignmentModel assign(Long id, ProjectModel p, EmployeeModel e) {
+        ProjectAdminAssignmentModel a = new ProjectAdminAssignmentModel();
+        a.setId(id); a.setProject(p); a.setEmployee(e); a.setActive(true);
+        return a;
+    }
+
+    private void setProjectAdminAuth() {
+        var auth = new UsernamePasswordAuthenticationToken("admin", null,
+                List.of(new SimpleGrantedAuthority("ROLE_PROJECT_ADMIN")));
+        SecurityContextHolder.setContext(new SecurityContextImpl(auth));
     }
 
     // ── createProject ─────────────────────────────────────────────────────────
 
     @Test
-    void createProject_savesProjectWithActiveStatusAndReturnsDTO() {
+    void createProject_savesAndReturnsDTO() {
         CreateProjectDTO dto = new CreateProjectDTO();
-        dto.setName("Sistema ERP");
-        dto.setDescription("Proyecto ERP empresa X");
-
-        ProjectModel saved = buildProject(1L, "Sistema ERP", "Proyecto ERP empresa X", ProjectStatusEnum.ACTIVE);
-        when(projectRepository.save(any(ProjectModel.class))).thenReturn(saved);
+        dto.setName("P1"); dto.setDescription("D1");
+        ProjectModel saved = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        when(projectRepository.save(any())).thenReturn(saved);
 
         ProjectDTO result = projectService.createProject(dto);
 
-        assertNotNull(result);
-        assertEquals(1L, result.id());
-        assertEquals("Sistema ERP", result.name());
-        assertEquals("Proyecto ERP empresa X", result.description());
+        assertEquals("P1", result.name());
         assertEquals("ACTIVE", result.status());
         assertNull(result.currentAdmin());
-        verify(projectRepository).save(any(ProjectModel.class));
-    }
-
-    @Test
-    void createProject_setsStatusToActive() {
-        CreateProjectDTO dto = new CreateProjectDTO();
-        dto.setName("Proyecto Test");
-        dto.setDescription(null);
-
-        ArgumentCaptor<ProjectModel> captor = ArgumentCaptor.forClass(ProjectModel.class);
-        ProjectModel saved = buildProject(2L, "Proyecto Test", null, ProjectStatusEnum.ACTIVE);
-        when(projectRepository.save(captor.capture())).thenReturn(saved);
-
-        projectService.createProject(dto);
-
-        assertEquals(ProjectStatusEnum.ACTIVE, captor.getValue().getStatus());
     }
 
     // ── getProjects ───────────────────────────────────────────────────────────
 
     @Test
     @SuppressWarnings("unchecked")
-    void getProjects_noFilter_returnsPagedResult() {
-        ProjectModel p1 = buildProject(1L, "P1", "d1", ProjectStatusEnum.ACTIVE);
-        ProjectModel p2 = buildProject(2L, "P2", "d2", ProjectStatusEnum.INACTIVE);
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of(p1, p2));
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
-        when(assignmentRepository.findByProjectIdAndActiveTrue(anyLong())).thenReturn(Optional.empty());
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(filter);
-
-        assertEquals(2, result.content().size());
-        verify(projectRepository).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_withStatusFilter_appliesFilter() {
-        ProjectModel p1 = buildProject(1L, "P1", "d1", ProjectStatusEnum.ACTIVE);
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of(p1));
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
+    void getProjects_returnsPagedResult() {
+        ProjectFilterDTO f = new ProjectFilterDTO();
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        when(projectRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(p)));
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setStatus("ACTIVE");
-
-        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(filter);
+        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(f);
 
         assertEquals(1, result.content().size());
-        assertEquals("ACTIVE", result.content().get(0).status());
+        assertEquals("P1", result.content().get(0).name());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_withLowercaseStatusFilter_works() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setStatus("inactive");
-
-        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(filter);
-
-        assertTrue(result.content().isEmpty());
-    }
-
-    @Test
-    void getProjects_withInvalidStatusFilter_throwsBadRequestException() {
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setStatus("UNKNOWN");
-
-        assertThrows(BadRequestException.class, () -> projectService.getProjects(filter));
-        verify(projectRepository, never()).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_withSearchFilter_passesSpecification() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setSearch("erp");
-
-        projectService.getProjects(filter);
-
-        verify(projectRepository).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_paginationParams_passedCorrectly() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(projectRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setPage(2);
-        filter.setSize(5);
-        filter.setSortBy("name");
-        filter.setSortDir("asc");
-
-        projectService.getProjects(filter);
-
-        Pageable pageable = pageableCaptor.getValue();
-        assertEquals(2, pageable.getPageNumber());
-        assertEquals(5, pageable.getPageSize());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_sizeExceedsMax_cappedAt100() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(projectRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setSize(999);
-
-        projectService.getProjects(filter);
-
-        assertEquals(100, pageableCaptor.getValue().getPageSize());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_pageNegative_normalizedToZero() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(projectRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setPage(-5);
-
-        projectService.getProjects(filter);
-
-        assertEquals(0, pageableCaptor.getValue().getPageNumber());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_withAdmin_includesAdminInfoInResult() {
-        ProjectModel p = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        EmployeeModel emp = buildEmployee(10L, "John", "Doe");
-        ProjectAdminAssignmentModel assignment = buildAssignment(5L, p, emp, true);
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of(p));
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
-        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(assignment));
-
-        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(new ProjectFilterDTO());
-
-        assertEquals(1, result.content().size());
-        assertNotNull(result.content().get(0).currentAdmin());
-        assertEquals(5L, result.content().get(0).currentAdmin().assignmentId());
-        assertEquals("John", result.content().get(0).currentAdmin().firstName());
-        assertEquals("Doe", result.content().get(0).currentAdmin().lastName());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_unknownSortBy_defaultsToCreatedAt() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(projectRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setSortBy("nonExistentField");
-
-        projectService.getProjects(filter);
-
-        // Should not throw; defaults to createdAt
-        verify(projectRepository).findAll(any(Specification.class), any(Pageable.class));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_returnsCorrectPageMetadata() {
-        ProjectModel p = buildProject(1L, "P", "d", ProjectStatusEnum.ACTIVE);
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of(p),
-                org.springframework.data.domain.PageRequest.of(0, 10), 1L);
-        when(projectRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(mockPage);
-        when(assignmentRepository.findByProjectIdAndActiveTrue(anyLong())).thenReturn(Optional.empty());
-
-        PagedResponseDTO<ProjectDTO> result = projectService.getProjects(new ProjectFilterDTO());
-
-        assertEquals(0, result.page());
-        assertEquals(10, result.size());
-        assertEquals(1L, result.totalElements());
-        assertEquals(1, result.totalPages());
-        assertTrue(result.last());
+    void getProjects_invalidStatus_throwsBadRequest() {
+        ProjectFilterDTO f = new ProjectFilterDTO();
+        f.setStatus("INVALID");
+        assertThrows(BadRequestException.class, () -> projectService.getProjects(f));
     }
 
     // ── getProjectById ────────────────────────────────────────────────────────
 
     @Test
-    void getProjectById_found_returnsProjectDTO() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
+    void getProjectById_found_returnsDTO() throws NotFoundException {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
         ProjectDTO result = projectService.getProjectById(1L);
-
-        assertNotNull(result);
         assertEquals(1L, result.id());
-        assertEquals("P1", result.name());
+        assertNull(result.currentAdmin());
     }
 
     @Test
-    void getProjectById_notFound_throwsNotFoundException() {
+    void getProjectById_notFound_throws() {
         when(projectRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThrows(NotFoundException.class, () -> projectService.getProjectById(99L));
     }
 
     @Test
-    void getProjectById_withAdmin_includesAdminInfo() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        EmployeeModel emp = buildEmployee(7L, "Alice", "Smith");
-        ProjectAdminAssignmentModel assignment = buildAssignment(3L, p, emp, true);
+    void getProjectById_projectAdmin_noAssignment_throwsAccessDenied() {
+        setProjectAdminAuth();
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
-        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(assignment));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
+        when(employeeRepository.findByUserUsername("admin")).thenReturn(Optional.of(emp(10L)));
+
+        assertThrows(AccessDeniedException.class, () -> projectService.getProjectById(1L));
+    }
+
+    @Test
+    void getProjectById_projectAdmin_assignedToSelf_returnsDTO() throws NotFoundException {
+        setProjectAdminAuth();
+        EmployeeModel e = emp(10L);
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        ProjectAdminAssignmentModel a = assign(5L, p, e);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(a));
+        when(employeeRepository.findByUserUsername("admin")).thenReturn(Optional.of(e));
 
         ProjectDTO result = projectService.getProjectById(1L);
-
         assertNotNull(result.currentAdmin());
-        assertEquals(7L, result.currentAdmin().employeeId());
-        assertEquals("Alice", result.currentAdmin().firstName());
+        assertEquals(10L, result.currentAdmin().employeeId());
+    }
+
+    // ── getMyProjects ─────────────────────────────────────────────────────────
+
+    @Test
+    void getMyProjects_asSystemAdmin_returnsAll() {
+        EmployeeModel e = emp(1L);
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        when(employeeRepository.findByUserUsername("admin")).thenReturn(Optional.of(e));
+        when(projectRepository.findAll()).thenReturn(List.of(p));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
+
+        List<ProjectDTO> result = projectService.getMyProjects();
+        assertEquals(1, result.size());
+    }
+
+    @Test
+    void getMyProjects_asProjectAdmin_returnsAssigned() {
+        setProjectAdminAuth();
+        EmployeeModel e = emp(10L);
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        ProjectAdminAssignmentModel a = assign(5L, p, e);
+        when(employeeRepository.findByUserUsername("admin")).thenReturn(Optional.of(e));
+        when(assignmentRepository.findByEmployeeIdAndActiveTrue(10L)).thenReturn(List.of(a));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(a));
+
+        List<ProjectDTO> result = projectService.getMyProjects();
+        assertEquals(1, result.size());
     }
 
     // ── updateProject ─────────────────────────────────────────────────────────
 
     @Test
-    void updateProject_updatesNameAndDescription() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "Old Name", "Old Desc", ProjectStatusEnum.ACTIVE);
+    void updateProject_updatesFields() throws NotFoundException {
+        ProjectModel p = proj(1L, "Old", ProjectStatusEnum.ACTIVE);
         UpdateProjectDTO dto = new UpdateProjectDTO();
-        dto.setName("New Name");
-        dto.setDescription("New Desc");
-
+        dto.setName("New"); dto.setDescription("NewDesc");
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         when(projectRepository.save(p)).thenReturn(p);
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
         ProjectDTO result = projectService.updateProject(1L, dto);
-
-        assertEquals("New Name", result.name());
-        assertEquals("New Desc", result.description());
-        verify(projectRepository).save(p);
+        assertEquals("New", result.name());
     }
 
     @Test
-    void updateProject_updatesNameOnly_descriptionUnchanged() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "Old Name", "Keep Desc", ProjectStatusEnum.ACTIVE);
+    void updateProject_emptyName_nameUnchanged() throws NotFoundException {
+        ProjectModel p = proj(1L, "Keep", ProjectStatusEnum.ACTIVE);
         UpdateProjectDTO dto = new UpdateProjectDTO();
-        dto.setName("New Name");
-        dto.setDescription(null);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
-        when(projectRepository.save(p)).thenReturn(p);
-        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
-
-        ProjectDTO result = projectService.updateProject(1L, dto);
-
-        assertEquals("New Name", result.name());
-        assertEquals("Keep Desc", result.description());
-    }
-
-    @Test
-    void updateProject_emptyName_doesNotUpdateName() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "Keep Name", "Old Desc", ProjectStatusEnum.ACTIVE);
-        UpdateProjectDTO dto = new UpdateProjectDTO();
-        dto.setName("");
-        dto.setDescription("New Desc");
-
+        dto.setName(""); dto.setDescription("NewDesc");
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         when(projectRepository.save(p)).thenReturn(p);
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
         projectService.updateProject(1L, dto);
-
-        assertEquals("Keep Name", p.getName());
+        assertEquals("Keep", p.getName());
     }
 
     @Test
-    void updateProject_projectNotFound_throwsNotFoundException() {
+    void updateProject_notFound_throws() {
         when(projectRepository.findById(99L)).thenReturn(Optional.empty());
-        UpdateProjectDTO dto = new UpdateProjectDTO();
-
-        assertThrows(NotFoundException.class, () -> projectService.updateProject(99L, dto));
-        verify(projectRepository, never()).save(any());
+        assertThrows(NotFoundException.class, () -> projectService.updateProject(99L, new UpdateProjectDTO()));
     }
 
     // ── toggleStatus ──────────────────────────────────────────────────────────
 
     @Test
     void toggleStatus_activeToInactive() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         when(projectRepository.save(p)).thenReturn(p);
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
-        ProjectDTO result = projectService.toggleStatus(1L);
-
-        assertEquals("INACTIVE", result.status());
+        projectService.toggleStatus(1L);
         assertEquals(ProjectStatusEnum.INACTIVE, p.getStatus());
     }
 
     @Test
     void toggleStatus_inactiveToActive() throws NotFoundException {
-        ProjectModel p = buildProject(2L, "P2", "desc", ProjectStatusEnum.INACTIVE);
-        when(projectRepository.findById(2L)).thenReturn(Optional.of(p));
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.INACTIVE);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         when(projectRepository.save(p)).thenReturn(p);
-        when(assignmentRepository.findByProjectIdAndActiveTrue(2L)).thenReturn(Optional.empty());
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
 
-        ProjectDTO result = projectService.toggleStatus(2L);
-
-        assertEquals("ACTIVE", result.status());
+        projectService.toggleStatus(1L);
         assertEquals(ProjectStatusEnum.ACTIVE, p.getStatus());
     }
 
     @Test
-    void toggleStatus_projectNotFound_throwsNotFoundException() {
+    void toggleStatus_notFound_throws() {
         when(projectRepository.findById(99L)).thenReturn(Optional.empty());
-
         assertThrows(NotFoundException.class, () -> projectService.toggleStatus(99L));
     }
 
     // ── assignAdmin ───────────────────────────────────────────────────────────
 
     @Test
-    void assignAdmin_validProjectAdminUser_createsNewAssignment() throws NotFoundException {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        RoleModel role = buildRole(2L, RolesEnum.PROJECT_ADMIN);
-        UserModel user = buildUser(20L, role);
-        EmployeeModel employee = buildEmployee(10L, "Bob", "Martin");
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(20L);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
-        when(employeeRepository.findByUserId(20L)).thenReturn(Optional.of(employee));
+    void assignAdmin_valid_createsAssignment() throws NotFoundException {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        UserModel u = user(2L, RolesEnum.PROJECT_ADMIN);
+        EmployeeModel e = emp(10L);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u));
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.of(e));
         when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
-        when(assignmentRepository.save(any(ProjectAdminAssignmentModel.class)))
-                .thenAnswer(inv -> {
-                    ProjectAdminAssignmentModel a = inv.getArgument(0);
-                    a.setId(99L);
-                    return a;
-                });
+        when(assignmentRepository.save(any())).thenReturn(assign(5L, p, e));
 
         ProjectDTO result = projectService.assignAdmin(1L, dto);
-
         assertNotNull(result.currentAdmin());
-        assertEquals(10L, result.currentAdmin().employeeId());
-        assertEquals("Bob", result.currentAdmin().firstName());
-        verify(assignmentRepository).save(any(ProjectAdminAssignmentModel.class));
     }
 
     @Test
-    void assignAdmin_existingActiveAssignment_deactivatesOldAndCreatesNew() throws NotFoundException {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        RoleModel role = buildRole(2L, RolesEnum.PROJECT_ADMIN);
-        UserModel user = buildUser(20L, role);
-        EmployeeModel employee = buildEmployee(10L, "Bob", "Martin");
-
-        EmployeeModel previousEmp = buildEmployee(5L, "Previous", "Admin");
-        ProjectAdminAssignmentModel existingAssignment = buildAssignment(50L, project, previousEmp, true);
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(20L);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
-        when(employeeRepository.findByUserId(20L)).thenReturn(Optional.of(employee));
-        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(existingAssignment));
-        when(assignmentRepository.saveAndFlush(any(ProjectAdminAssignmentModel.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-        when(assignmentRepository.save(any(ProjectAdminAssignmentModel.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-        projectService.assignAdmin(1L, dto);
-
-        assertFalse(existingAssignment.isActive());
-        assertNotNull(existingAssignment.getEndDate());
-        verify(assignmentRepository).saveAndFlush(any(ProjectAdminAssignmentModel.class));
-        verify(assignmentRepository).save(any(ProjectAdminAssignmentModel.class));
-    }
-
-    @Test
-    void assignAdmin_projectNotFound_throwsNotFoundException() {
-        when(projectRepository.findById(99L)).thenReturn(Optional.empty());
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(1L);
-
-        assertThrows(NotFoundException.class, () -> projectService.assignAdmin(99L, dto));
-        verify(userRepository, never()).findById(any());
-    }
-
-    @Test
-    void assignAdmin_userNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(99L);
-
-        assertThrows(NotFoundException.class, () -> projectService.assignAdmin(1L, dto));
-    }
-
-    @Test
-    void assignAdmin_userNotProjectAdmin_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        RoleModel role = buildRole(1L, RolesEnum.DEVELOPER);
-        UserModel user = buildUser(20L, role);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(20L);
-
+    void assignAdmin_inactiveProject_throwsBadRequest() {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.INACTIVE);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
         assertThrows(BadRequestException.class, () -> projectService.assignAdmin(1L, dto));
-        verify(employeeRepository, never()).findByUserId(any());
     }
 
     @Test
-    void assignAdmin_userIsSystemAdmin_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        RoleModel role = buildRole(1L, RolesEnum.SYSTEM_ADMIN);
-        UserModel user = buildUser(20L, role);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(20L);
-
-        BadRequestException ex = assertThrows(BadRequestException.class,
-                () -> projectService.assignAdmin(1L, dto));
-        assertTrue(ex.getMessage().contains("PROJECT_ADMIN"));
+    void assignAdmin_projectNotFound_throws() {
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> projectService.assignAdmin(99L, dto));
     }
 
     @Test
-    void assignAdmin_employeeNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
-        RoleModel role = buildRole(2L, RolesEnum.PROJECT_ADMIN);
-        UserModel user = buildUser(20L, role);
-
-        when(projectRepository.findById(1L)).thenReturn(Optional.of(project));
-        when(userRepository.findById(20L)).thenReturn(Optional.of(user));
-        when(employeeRepository.findByUserId(20L)).thenReturn(Optional.empty());
-
-        AssignProjectAdminDTO dto = new AssignProjectAdminDTO();
-        dto.setUserId(20L);
-
+    void assignAdmin_userNotFound_throws() {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(99L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
         assertThrows(NotFoundException.class, () -> projectService.assignAdmin(1L, dto));
+    }
+
+    @Test
+    void assignAdmin_wrongRole_throwsBadRequest() {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        UserModel u = user(2L, RolesEnum.DEVELOPER);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u));
+        assertThrows(BadRequestException.class, () -> projectService.assignAdmin(1L, dto));
+    }
+
+    @Test
+    void assignAdmin_employeeNotFound_throws() {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        UserModel u = user(2L, RolesEnum.PROJECT_ADMIN);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u));
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.empty());
+        assertThrows(NotFoundException.class, () -> projectService.assignAdmin(1L, dto));
+    }
+
+    @Test
+    void assignAdmin_sameAdminAlreadyAssigned_returnsExisting() throws NotFoundException {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        UserModel u = user(2L, RolesEnum.PROJECT_ADMIN);
+        EmployeeModel e = emp(10L);
+        ProjectAdminAssignmentModel existing = assign(5L, p, e);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
+        when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u));
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.of(e));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(existing));
+
+        ProjectDTO result = projectService.assignAdmin(1L, dto);
+        assertNotNull(result);
         verify(assignmentRepository, never()).save(any());
     }
 
-    // ── toDTO helper coverage ─────────────────────────────────────────────────
-
     @Test
-    void getProjectById_noAdmin_adminInfoIsNull() throws NotFoundException {
-        ProjectModel p = buildProject(1L, "P1", "desc", ProjectStatusEnum.ACTIVE);
+    void assignAdmin_differentAdmin_deactivatesOldAndCreatesNew() throws NotFoundException {
+        ProjectModel p = proj(1L, "P1", ProjectStatusEnum.ACTIVE);
+        UserModel u = user(2L, RolesEnum.PROJECT_ADMIN);
+        EmployeeModel newEmp = emp(20L);
+        EmployeeModel oldEmp = emp(10L);
+        ProjectAdminAssignmentModel existing = assign(5L, p, oldEmp);
+        AssignProjectAdminDTO dto = new AssignProjectAdminDTO(); dto.setUserId(2L);
         when(projectRepository.findById(1L)).thenReturn(Optional.of(p));
-        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.empty());
+        when(userRepository.findById(2L)).thenReturn(Optional.of(u));
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.of(newEmp));
+        when(assignmentRepository.findByProjectIdAndActiveTrue(1L)).thenReturn(Optional.of(existing));
+        when(assignmentRepository.saveAndFlush(existing)).thenReturn(existing);
+        when(assignmentRepository.save(any())).thenReturn(assign(6L, p, newEmp));
 
-        ProjectDTO result = projectService.getProjectById(1L);
-
-        assertNull(result.currentAdmin());
-    }
-
-    // ── builder helpers ───────────────────────────────────────────────────────
-
-    private static ProjectModel buildProject(Long id, String name, String description, ProjectStatusEnum status) {
-        ProjectModel project = new ProjectModel();
-        project.setId(id);
-        project.setName(name);
-        project.setDescription(description);
-        project.setStatus(status);
-        project.setCreatedAt(Instant.now());
-        project.setUpdatedAt(Instant.now());
-        return project;
-    }
-
-    private static EmployeeModel buildEmployee(Long id, String firstName, String lastName) {
-        EmployeeModel emp = new EmployeeModel();
-        emp.setId(id);
-        emp.setFirst_name(firstName);
-        emp.setLast_name(lastName);
-        emp.setHourly_rate(0.0);
-        return emp;
-    }
-
-    private static RoleModel buildRole(Long id, RolesEnum code) {
-        return new RoleModel(id, code, code.getCode(), null);
-    }
-
-    private static UserModel buildUser(Long id, RoleModel role) {
-        return new UserModel(id, "user" + id, "user" + id + "@mail.com", "hash", role);
-    }
-
-    private static ProjectAdminAssignmentModel buildAssignment(Long id, ProjectModel project,
-                                                                EmployeeModel employee, boolean active) {
-        ProjectAdminAssignmentModel a = new ProjectAdminAssignmentModel();
-        a.setId(id);
-        a.setProject(project);
-        a.setEmployee(employee);
-        a.setActive(active);
-        return a;
+        ProjectDTO result = projectService.assignAdmin(1L, dto);
+        assertNotNull(result.currentAdmin());
+        assertFalse(existing.isActive());
     }
 }

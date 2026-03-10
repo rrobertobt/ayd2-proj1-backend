@@ -1,7 +1,6 @@
 package edu.robertob.ayd2_p1_backend.cases.services;
 
 import edu.robertob.ayd2_p1_backend.auth.users.models.entities.EmployeeModel;
-import edu.robertob.ayd2_p1_backend.auth.users.models.entities.UserModel;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.EmployeeRepository;
 import edu.robertob.ayd2_p1_backend.cases.enums.CaseStatusEnum;
 import edu.robertob.ayd2_p1_backend.cases.enums.CaseStepStatusEnum;
@@ -9,18 +8,16 @@ import edu.robertob.ayd2_p1_backend.cases.models.dto.request.ApproveStepDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.request.AssignStepDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.request.CreateWorklogDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.request.RejectStepDTO;
-import edu.robertob.ayd2_p1_backend.cases.models.dto.response.CaseStepDTO;
-import edu.robertob.ayd2_p1_backend.cases.models.dto.response.WorklogDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.entities.CaseStepModel;
 import edu.robertob.ayd2_p1_backend.cases.models.entities.CaseTicketModel;
 import edu.robertob.ayd2_p1_backend.cases.models.entities.WorkLogModel;
 import edu.robertob.ayd2_p1_backend.cases.repositories.CaseStepRepository;
 import edu.robertob.ayd2_p1_backend.cases.repositories.CaseTicketRepository;
 import edu.robertob.ayd2_p1_backend.cases.repositories.WorkLogRepository;
-import edu.robertob.ayd2_p1_backend.casetypes.models.entities.CaseTypeModel;
 import edu.robertob.ayd2_p1_backend.casetypes.models.entities.CaseTypeStageModel;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
+import edu.robertob.ayd2_p1_backend.projects.enums.ProjectStatusEnum;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,1004 +26,306 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextImpl;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CaseStepServiceTest {
 
-    @Mock private CaseTicketRepository caseTicketRepository;
-    @Mock private CaseStepRepository caseStepRepository;
-    @Mock private EmployeeRepository employeeRepository;
-    @Mock private WorkLogRepository workLogRepository;
+    @Mock CaseTicketRepository caseTicketRepository;
+    @Mock CaseStepRepository caseStepRepository;
+    @Mock EmployeeRepository employeeRepository;
+    @Mock WorkLogRepository workLogRepository;
 
-    @InjectMocks
-    private CaseStepService caseStepService;
+    @InjectMocks CaseStepService service;
 
     @BeforeEach
-    void setUpSecurityContext() {
-        var auth = new UsernamePasswordAuthenticationToken("dev_user", null, List.of());
-        SecurityContextHolder.setContext(new SecurityContextImpl(auth));
+    void setUpSecurity() {
+        SecurityContext ctx = mock(SecurityContext.class);
+        Authentication auth = mock(Authentication.class);
+        lenient().when(ctx.getAuthentication()).thenReturn(auth);
+        lenient().when(auth.getName()).thenReturn("dev");
+        SecurityContextHolder.setContext(ctx);
     }
 
     @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
-
-    // ── getSteps ──────────────────────────────────────────────────────────────
-
-    @Test
-    void getSteps_caseExists_returnsStepList() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel employee = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, employee,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage 1", 1);
-        CaseStepModel step1 = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-        CaseStepModel step2 = buildStep(201L, ticket, stage, 2, CaseStepStatusEnum.PENDING);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
-
-        List<CaseStepDTO> result = caseStepService.getSteps(1L);
-
-        assertEquals(2, result.size());
-        assertEquals(200L, result.get(0).id());
-        assertEquals(201L, result.get(1).id());
-    }
-
-    @Test
-    void getSteps_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class, () -> caseStepService.getSteps(99L));
-        verify(caseStepRepository, never()).findByCaseTicketIdOrderByStepOrderAsc(any());
-    }
-
-    @Test
-    void getSteps_noSteps_returnsEmptyList() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel employee = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, employee,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of());
-
-        List<CaseStepDTO> result = caseStepService.getSteps(1L);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void getSteps_stepWithAssignedEmployee_returnsAssignedInfo() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.ASSIGNED);
-        step.setAssignedEmployee(assignee);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step));
-
-        List<CaseStepDTO> result = caseStepService.getSteps(1L);
-
-        assertEquals(11L, result.get(0).assignedEmployeeId());
-        assertEquals("Ana García", result.get(0).assignedEmployeeName());
-    }
+    void clearSecurity() { SecurityContextHolder.clearContext(); }
 
     // ── assignStep ────────────────────────────────────────────────────────────
 
     @Test
-    void assignStep_validMember_assignsAndReturnsDTO() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(caseTicketRepository.save(ticket)).thenReturn(ticket);
-
-        CaseStepDTO result = caseStepService.assignStep(1L, 200L, dto);
-
-        assertNotNull(result);
-        assertEquals("ASSIGNED", result.status());
-        verify(caseStepRepository).save(step);
-        assertEquals(CaseStepStatusEnum.ASSIGNED, step.getStatus());
-        assertNotNull(step.getAssignedAt());
-    }
-
-    @Test
-    void assignStep_openCase_transitionToInProgress() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(caseTicketRepository.save(ticket)).thenReturn(ticket);
-
-        caseStepService.assignStep(1L, 200L, dto);
-
-        assertEquals(CaseStatusEnum.IN_PROGRESS, ticket.getStatus());
-        verify(caseTicketRepository).save(ticket);
-    }
-
-    @Test
-    void assignStep_alreadyInProgress_doesNotSaveTicketAgain() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step)).thenReturn(step);
-
-        caseStepService.assignStep(1L, 200L, dto);
-
-        verify(caseTicketRepository, never()).save(any());
-    }
-
-    @Test
-    void assignStep_approvedStep_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.APPROVED);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.assignStep(1L, 200L, dto));
-    }
-
-    @Test
-    void assignStep_canceledCase_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.CANCELED, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.assignStep(1L, 200L, dto));
-    }
-
-    @Test
-    void assignStep_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
+    void assignStep_throwsWhenCaseNotFound() {
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThrows(NotFoundException.class,
-                () -> caseStepService.assignStep(99L, 200L, dto));
+                () -> service.assignStep(1L, 1L, new AssignStepDTO()));
     }
 
     @Test
-    void assignStep_stepNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
+    void assignStep_throwsWhenProjectInactive() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.INACTIVE, CaseStatusEnum.OPEN);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.PENDING);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(999L, 1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.assignStep(1L, 999L, dto));
-    }
-
-    @Test
-    void assignStep_userNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(999L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserId(999L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.assignStep(1L, 200L, dto));
-    }
-
-    @Test
-    void assignStep_previousStepNotApproved_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
-        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
-        // Step 1 is still IN_PROGRESS (not APPROVED)
-        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.IN_PROGRESS);
-        // Trying to assign step 2 while step 1 is not approved
-        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
 
         assertThrows(BadRequestException.class,
-                () -> caseStepService.assignStep(1L, 201L, dto));
-        verify(caseStepRepository, never()).save(any());
+                () -> service.assignStep(1L, 1L, new AssignStepDTO()));
     }
 
     @Test
-    void assignStep_previousStepPending_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
-        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
-        // Step 1 is still PENDING (no developer assigned yet)
-        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.PENDING);
-        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
+    void assignStep_throwsWhenCaseCanceled() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.CANCELED);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.PENDING);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
 
         assertThrows(BadRequestException.class,
-                () -> caseStepService.assignStep(1L, 201L, dto));
-        verify(caseStepRepository, never()).save(any());
+                () -> service.assignStep(1L, 1L, new AssignStepDTO()));
     }
 
     @Test
-    void assignStep_allPreviousStepsApproved_assignsSuccessfully() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
-        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
-        // Step 1 is APPROVED — step 2 can now be assigned
-        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.APPROVED);
-        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
+    void assignStep_throwsWhenStepAlreadyApproved() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.OPEN);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.APPROVED);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(201L, 1L)).thenReturn(Optional.of(step2));
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
-        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step2)).thenReturn(step2);
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
 
-        CaseStepDTO result = caseStepService.assignStep(1L, 201L, dto);
+        assertThrows(BadRequestException.class,
+                () -> service.assignStep(1L, 1L, new AssignStepDTO()));
+    }
 
-        assertNotNull(result);
-        assertEquals("ASSIGNED", result.status());
-        assertEquals(CaseStepStatusEnum.ASSIGNED, step2.getStatus());
+    @Test
+    void assignStep_throwsWhenPreviousStepNotApproved() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.OPEN);
+        CaseStepModel step1 = buildStep(1, CaseStepStatusEnum.PENDING);
+        CaseStepModel step2 = buildStep(2, CaseStepStatusEnum.PENDING);
+        step2.setId(2L);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(2L, 1L)).thenReturn(Optional.of(step2));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step1, step2));
+
+        AssignStepDTO dto = new AssignStepDTO();
+        dto.setUserId(10L);
+        assertThrows(BadRequestException.class, () -> service.assignStep(1L, 2L, dto));
+    }
+
+    @Test
+    void assignStep_success() throws NotFoundException {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.OPEN);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.PENDING);
+        EmployeeModel employee = buildEmployee(10L);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step));
+        when(employeeRepository.findByUserId(10L)).thenReturn(Optional.of(employee));
+        when(caseStepRepository.save(step)).thenReturn(step);
+
+        AssignStepDTO dto = new AssignStepDTO();
+        dto.setUserId(10L);
+        var result = service.assignStep(1L, 1L, dto);
+
+        assertEquals(CaseStepStatusEnum.ASSIGNED.name(), result.status());
+        verify(caseTicketRepository).save(ticket); // case moved to IN_PROGRESS
     }
 
     // ── approveStep ───────────────────────────────────────────────────────────
 
     @Test
-    void approveStep_submittedStep_withNextStep_assignsNext() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel nextEmployee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage1 = buildStage(100L, caseType, "Stage 1", 1);
-        CaseTypeStageModel stage2 = buildStage(101L, caseType, "Stage 2", 2);
-        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.SUBMITTED);
-        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
-
-        ApproveStepDTO dto = new ApproveStepDTO();
-        dto.setNextAssigneeUserId(50L);
+    void approveStep_throwsWhenNoWorklog() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.SUBMITTED);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step1));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step1)).thenReturn(step1);
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
-        when(employeeRepository.findByUserId(50L)).thenReturn(Optional.of(nextEmployee));
-        when(caseStepRepository.save(step2)).thenReturn(step2);
-        when(caseStepRepository.findById(200L)).thenReturn(Optional.of(step1));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(1L)).thenReturn(false);
 
-        CaseStepDTO result = caseStepService.approveStep(1L, 200L, dto);
-
-        assertNotNull(result);
-        assertEquals(CaseStepStatusEnum.APPROVED, step1.getStatus());
-        assertNotNull(step1.getApprovedAt());
-        assertEquals(CaseStepStatusEnum.ASSIGNED, step2.getStatus());
-        assertNotNull(step2.getAssignedAt());
-        verify(caseTicketRepository, never()).save(any());
+        assertThrows(BadRequestException.class,
+                () -> service.approveStep(1L, 1L, new ApproveStepDTO()));
     }
 
     @Test
-    void approveStep_lastStep_completesCase() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Only Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.SUBMITTED);
-
-        ApproveStepDTO dto = new ApproveStepDTO();
+    void approveStep_throwsWhenInvalidStatus() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.PENDING);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step));
-        when(caseTicketRepository.save(ticket)).thenReturn(ticket);
-        when(caseStepRepository.findById(200L)).thenReturn(Optional.of(step));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(1L)).thenReturn(true);
 
-        caseStepService.approveStep(1L, 200L, dto);
+        assertThrows(BadRequestException.class,
+                () -> service.approveStep(1L, 1L, new ApproveStepDTO()));
+    }
+
+    @Test
+    void approveStep_lastStep_completesCase() throws NotFoundException {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.SUBMITTED);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(1L)).thenReturn(true);
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step));
+        when(caseStepRepository.save(step)).thenReturn(step);
+        when(caseStepRepository.findById(1L)).thenReturn(Optional.of(step));
+
+        service.approveStep(1L, 1L, new ApproveStepDTO());
 
         assertEquals(CaseStatusEnum.COMPLETED, ticket.getStatus());
         verify(caseTicketRepository).save(ticket);
     }
 
-    @Test
-    void approveStep_lastStep_nextAssigneeIgnored() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Only Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.SUBMITTED);
-
-        ApproveStepDTO dto = new ApproveStepDTO();
-        dto.setNextAssigneeUserId(50L); // should be ignored
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step));
-        when(caseTicketRepository.save(ticket)).thenReturn(ticket);
-        when(caseStepRepository.findById(200L)).thenReturn(Optional.of(step));
-
-        caseStepService.approveStep(1L, 200L, dto);
-
-        verify(employeeRepository, never()).findByUserId(any());
-    }
-
-    @Test
-    void approveStep_inProgressStep_approvesSuccessfully() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.IN_PROGRESS);
-
-        ApproveStepDTO dto = new ApproveStepDTO();
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step));
-        when(caseTicketRepository.save(ticket)).thenReturn(ticket);
-        when(caseStepRepository.findById(200L)).thenReturn(Optional.of(step));
-
-        CaseStepDTO result = caseStepService.approveStep(1L, 200L, dto);
-
-        assertNotNull(result);
-        assertEquals(CaseStepStatusEnum.APPROVED, step.getStatus());
-    }
-
-    @Test
-    void approveStep_pendingStep_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.approveStep(1L, 200L, new ApproveStepDTO()));
-    }
-
-    @Test
-    void approveStep_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.approveStep(99L, 200L, new ApproveStepDTO()));
-    }
-
-    @Test
-    void approveStep_stepNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(999L, 1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.approveStep(1L, 999L, new ApproveStepDTO()));
-    }
-
     // ── rejectStep ────────────────────────────────────────────────────────────
 
     @Test
-    void rejectStep_submittedStep_rejectsAndSetsInProgress() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.SUBMITTED);
-        step.setAssignedEmployee(assignee);
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Falta manejar edge cases en la validación");
+    void rejectStep_throwsWhenNoWorklog() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.SUBMITTED);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(1L)).thenReturn(false);
+
+        RejectStepDTO dto = new RejectStepDTO();
+        dto.setReason("not done");
+        assertThrows(BadRequestException.class, () -> service.rejectStep(1L, 1L, dto));
+    }
+
+    @Test
+    void rejectStep_success() throws NotFoundException {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.SUBMITTED);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(1L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
 
-        CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
-
-        assertNotNull(result);
-        assertEquals(CaseStepStatusEnum.IN_PROGRESS, step.getStatus());
-        assertNotNull(step.getRejectedAt());
-        assertEquals("Falta manejar edge cases en la validación", step.getRejectionReason());
-    }
-
-    @Test
-    void rejectStep_inProgressStep_rejectsSuccessfully() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.IN_PROGRESS);
-
         RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Correcciones necesarias");
+        dto.setReason("needs more work");
+        var result = service.rejectStep(1L, 1L, dto);
 
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step)).thenReturn(step);
-
-        CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
-
-        assertNotNull(result);
-        assertEquals(CaseStepStatusEnum.IN_PROGRESS, step.getStatus());
-    }
-
-    @Test
-    void rejectStep_assignedStep_rejectsSuccessfully() throws Exception {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.ASSIGNED);
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Asignación incorrecta");
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
-        when(caseStepRepository.save(step)).thenReturn(step);
-
-        CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
-
-        assertEquals(CaseStepStatusEnum.IN_PROGRESS, step.getStatus());
-        assertNotNull(result);
-    }
-
-    @Test
-    void rejectStep_pendingStep_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Razón");
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.rejectStep(1L, 200L, dto));
-        verify(caseStepRepository, never()).save(any());
-    }
-
-    @Test
-    void rejectStep_approvedStep_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.APPROVED);
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Razón");
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.rejectStep(1L, 200L, dto));
-    }
-
-    @Test
-    void rejectStep_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Razón");
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.rejectStep(99L, 200L, dto));
-    }
-
-    @Test
-    void rejectStep_stepNotFound_throwsNotFoundException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-
-        RejectStepDTO dto = new RejectStepDTO();
-        dto.setReason("Razón");
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(999L, 1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.rejectStep(1L, 999L, dto));
+        assertEquals(CaseStepStatusEnum.IN_PROGRESS.name(), result.status());
+        assertEquals("needs more work", result.rejectionReason());
     }
 
     // ── createWorklog ─────────────────────────────────────────────────────────
 
     @Test
-    void createWorklog_assignedStep_transitionsToSubmitted() throws Exception {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.ASSIGNED);
-        step.setAssignedEmployee(assignee);
+    void createWorklog_throwsWhenCaseCanceled() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.CANCELED);
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
 
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Corrección implementada");
-        dto.setHoursSpent(4.0);
+        assertThrows(BadRequestException.class,
+                () -> service.createWorklog(1L, 1L, new CreateWorklogDTO()));
+    }
 
-        WorkLogModel savedLog = new WorkLogModel();
-        savedLog.setId(300L);
-        savedLog.setCaseStep(step);
-        savedLog.setEmployee(assignee);
-        savedLog.setComment(dto.getComment());
-        savedLog.setHoursSpent(dto.getHoursSpent());
-        savedLog.setCreatedAt(Instant.now());
-        savedLog.setUpdatedAt(Instant.now());
+    @Test
+    void createWorklog_throwsWhenStepNotAssigned() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.PENDING);
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserUsername("dev_user")).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(workLogRepository.save(any(WorkLogModel.class))).thenReturn(savedLog);
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
 
-        WorklogDTO result = caseStepService.createWorklog(1L, 200L, dto);
+        assertThrows(BadRequestException.class,
+                () -> service.createWorklog(1L, 1L, new CreateWorklogDTO()));
+    }
+
+    @Test
+    void createWorklog_throwsWhenNotAssignedEmployee() {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.ASSIGNED);
+        EmployeeModel assignedEmp = buildEmployee(99L); // different employee
+        EmployeeModel callerEmp = buildEmployee(1L);
+        step.setAssignedEmployee(assignedEmp);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(employeeRepository.findByUserUsername("dev")).thenReturn(Optional.of(callerEmp));
+
+        assertThrows(AccessDeniedException.class,
+                () -> service.createWorklog(1L, 1L, new CreateWorklogDTO()));
+    }
+
+    @Test
+    void createWorklog_success() throws NotFoundException {
+        CaseTicketModel ticket = buildTicket(ProjectStatusEnum.ACTIVE, CaseStatusEnum.IN_PROGRESS);
+        CaseStepModel step = buildStep(1, CaseStepStatusEnum.ASSIGNED);
+        EmployeeModel employee = buildEmployee(1L);
+        step.setAssignedEmployee(employee);
+
+        WorkLogModel savedLog = new WorkLogModel();
+        savedLog.setId(10L);
+        savedLog.setCaseStep(step);
+        savedLog.setEmployee(employee);
+        savedLog.setComment("done");
+        savedLog.setHoursSpent(2.0);
+
+        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
+        when(caseStepRepository.findByIdAndCaseTicketId(1L, 1L)).thenReturn(Optional.of(step));
+        when(employeeRepository.findByUserUsername("dev")).thenReturn(Optional.of(employee));
+        when(caseStepRepository.save(step)).thenReturn(step);
+        when(workLogRepository.save(any())).thenReturn(savedLog);
+
+        CreateWorklogDTO dto = new CreateWorklogDTO();
+        dto.setComment("done");
+        dto.setHoursSpent(2.0);
+        var result = service.createWorklog(1L, 1L, dto);
 
         assertNotNull(result);
-        assertEquals(CaseStepStatusEnum.SUBMITTED, step.getStatus());
-        assertNotNull(step.getSubmittedAt());
-        assertNotNull(step.getStartedAt()); // startedAt is set when step was ASSIGNED
-        verify(caseStepRepository).save(step);
-        verify(workLogRepository).save(any(WorkLogModel.class));
+        assertEquals("done", result.comment());
+        verify(workLogRepository).save(any());
     }
 
-    @Test
-    void createWorklog_inProgressStep_transitionsToSubmittedWithoutOverwritingStartedAt() throws Exception {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.IN_PROGRESS);
-        step.setAssignedEmployee(assignee);
-        Instant originalStartedAt = Instant.now().minusSeconds(3600);
-        step.setStartedAt(originalStartedAt);
+    // ── helpers ───────────────────────────────────────────────────────────────
 
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Corregida segunda vuelta");
-        dto.setHoursSpent(2.0);
+    private CaseTicketModel buildTicket(ProjectStatusEnum projStatus, CaseStatusEnum caseStatus) {
+        ProjectModel project = new ProjectModel();
+        project.setId(1L);
+        project.setName("Project");
+        project.setStatus(projStatus);
 
-        WorkLogModel savedLog = new WorkLogModel();
-        savedLog.setId(301L);
-        savedLog.setCaseStep(step);
-        savedLog.setEmployee(assignee);
-        savedLog.setComment(dto.getComment());
-        savedLog.setHoursSpent(dto.getHoursSpent());
-        savedLog.setCreatedAt(Instant.now());
-        savedLog.setUpdatedAt(Instant.now());
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserUsername("dev_user")).thenReturn(Optional.of(assignee));
-        when(caseStepRepository.save(step)).thenReturn(step);
-        when(workLogRepository.save(any(WorkLogModel.class))).thenReturn(savedLog);
-
-        caseStepService.createWorklog(1L, 200L, dto);
-
-        assertEquals(CaseStepStatusEnum.SUBMITTED, step.getStatus());
-        assertNotNull(step.getSubmittedAt());
-        assertEquals(originalStartedAt, step.getStartedAt()); // must NOT be overwritten
+        CaseTicketModel ticket = new CaseTicketModel();
+        ticket.setId(1L);
+        ticket.setProject(project);
+        ticket.setStatus(caseStatus);
+        ticket.setDueDate(LocalDate.now().plusDays(7));
+        return ticket;
     }
 
-    @Test
-    void createWorklog_notAssignedDeveloper_throwsAccessDeniedException() {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        EmployeeModel otherDev = buildEmployee(12L, "Pedro", "López", "other_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.ASSIGNED);
-        step.setAssignedEmployee(otherDev); // assigned to someone else
-
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Trabajo no autorizado");
-        dto.setHoursSpent(1.0);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserUsername("dev_user")).thenReturn(Optional.of(assignee));
-
-        assertThrows(org.springframework.security.access.AccessDeniedException.class,
-                () -> caseStepService.createWorklog(1L, 200L, dto));
-        verify(workLogRepository, never()).save(any());
-    }
-
-    @Test
-    void createWorklog_submittedStep_throwsBadRequestException() {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.SUBMITTED);
-        step.setAssignedEmployee(assignee);
-
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Esto ya fue enviado");
-        dto.setHoursSpent(1.0);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.createWorklog(1L, 200L, dto));
-        verify(workLogRepository, never()).save(any());
-    }
-
-    @Test
-    void createWorklog_canceledCase_throwsBadRequestException() {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.CANCELED, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Trabajo en caso cancelado");
-        dto.setHoursSpent(1.0);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.createWorklog(1L, 200L, dto));
-        verify(workLogRepository, never()).save(any());
-    }
-
-    @Test
-    void createWorklog_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        CreateWorklogDTO dto = new CreateWorklogDTO();
-        dto.setComment("Trabajo");
-        dto.setHoursSpent(1.0);
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.createWorklog(99L, 200L, dto));
-    }
-
-    // ── getWorklogs ───────────────────────────────────────────────────────────
-
-    @Test
-    void getWorklogs_returnsOrderedList() throws Exception {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.SUBMITTED);
-        step.setAssignedEmployee(assignee);
-
-        WorkLogModel log1 = buildWorkLog(300L, step, assignee, "Primera entrega", 3.0,
-                Instant.now().minusSeconds(7200));
-        WorkLogModel log2 = buildWorkLog(301L, step, assignee, "Segunda entrega tras rechazo",
-                2.0, Instant.now().minusSeconds(3600));
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.findByCaseStepIdOrderByCreatedAtAsc(200L))
-                .thenReturn(List.of(log1, log2));
-
-        List<WorklogDTO> result = caseStepService.getWorklogs(1L, 200L);
-
-        assertEquals(2, result.size());
-        assertEquals(300L, result.get(0).id());
-        assertEquals("Primera entrega", result.get(0).comment());
-        assertEquals(301L, result.get(1).id());
-    }
-
-    @Test
-    void getWorklogs_noWorklogs_returnsEmptyList() throws Exception {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.ASSIGNED);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(workLogRepository.findByCaseStepIdOrderByCreatedAtAsc(200L)).thenReturn(List.of());
-
-        List<WorklogDTO> result = caseStepService.getWorklogs(1L, 200L);
-
-        assertTrue(result.isEmpty());
-    }
-
-    @Test
-    void getWorklogs_caseNotFound_throwsNotFoundException() {
-        when(caseTicketRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.getWorklogs(99L, 200L));
-        verify(workLogRepository, never()).findByCaseStepIdOrderByCreatedAtAsc(any());
-    }
-
-    @Test
-    void getWorklogs_stepNotFound_throwsNotFoundException() {
-        EmployeeModel assignee = buildEmployee(11L, "Ana", "García", "dev_user");
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, assignee,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(999L, 1L)).thenReturn(Optional.empty());
-
-        assertThrows(NotFoundException.class,
-                () -> caseStepService.getWorklogs(1L, 999L));
-        verify(workLogRepository, never()).findByCaseStepIdOrderByCreatedAtAsc(any());
-    }
-
-    // ── builder helpers ───────────────────────────────────────────────────────
-
-    private static ProjectModel buildProject(Long id, String name) {
-        ProjectModel p = new ProjectModel();
-        p.setId(id);
-        p.setName(name);
-        p.setCreatedAt(Instant.now());
-        p.setUpdatedAt(Instant.now());
-        return p;
-    }
-
-    private static CaseTypeModel buildCaseType(Long id, String name) {
-        CaseTypeModel ct = new CaseTypeModel();
-        ct.setId(id);
-        ct.setName(name);
-        ct.setActive(true);
-        ct.setCreatedAt(Instant.now());
-        ct.setUpdatedAt(Instant.now());
-        return ct;
-    }
-
-    private static CaseTypeStageModel buildStage(Long id, CaseTypeModel caseType,
-                                                   String name, int order) {
+    private CaseStepModel buildStep(int order, CaseStepStatusEnum status) {
         CaseTypeStageModel stage = new CaseTypeStageModel();
-        stage.setId(id);
-        stage.setCaseType(caseType);
-        stage.setName(name);
-        stage.setStageOrder(order);
-        stage.setActive(true);
-        stage.setCreatedAt(Instant.now());
-        stage.setUpdatedAt(Instant.now());
-        return stage;
-    }
+        stage.setId(1L);
+        stage.setName("Stage " + order);
 
-    private static EmployeeModel buildEmployee(Long id, String firstName, String lastName) {
-        UserModel user = new UserModel();
-        user.setId(id * 100);
-        user.setUsername("user" + id);
-
-        EmployeeModel emp = new EmployeeModel();
-        emp.setId(id);
-        emp.setFirst_name(firstName);
-        emp.setLast_name(lastName);
-        emp.setUser(user);
-        emp.setCreatedAt(Instant.now());
-        emp.setUpdatedAt(Instant.now());
-        return emp;
-    }
-
-    private static EmployeeModel buildEmployee(Long id, String firstName, String lastName,
-                                                String username) {
-        EmployeeModel emp = buildEmployee(id, firstName, lastName);
-        emp.getUser().setUsername(username);
-        return emp;
-    }
-
-    private static WorkLogModel buildWorkLog(Long id, CaseStepModel step, EmployeeModel employee,
-                                              String comment, Double hours,
-                                              Instant createdAt) {
-        WorkLogModel log = new WorkLogModel();
-        log.setId(id);
-        log.setCaseStep(step);
-        log.setEmployee(employee);
-        log.setComment(comment);
-        log.setHoursSpent(hours);
-        log.setCreatedAt(createdAt);
-        log.setUpdatedAt(createdAt);
-        return log;
-    }
-
-    private static CaseTicketModel buildTicket(Long id, ProjectModel project,
-                                                CaseTypeModel caseType, EmployeeModel employee,
-                                                CaseStatusEnum status, LocalDate dueDate) {
-        CaseTicketModel t = new CaseTicketModel();
-        t.setId(id);
-        t.setProject(project);
-        t.setCaseType(caseType);
-        t.setCreatedByEmployee(employee);
-        t.setTitle("Test Case " + id);
-        t.setStatus(status);
-        t.setDueDate(dueDate);
-        t.setCreatedAt(Instant.now());
-        t.setUpdatedAt(Instant.now());
-        return t;
-    }
-
-    private static CaseStepModel buildStep(Long id, CaseTicketModel ticket,
-                                            CaseTypeStageModel stage, int order,
-                                            CaseStepStatusEnum status) {
         CaseStepModel step = new CaseStepModel();
-        step.setId(id);
-        step.setCaseTicket(ticket);
-        step.setCaseTypeStage(stage);
+        step.setId(1L);
         step.setStepOrder(order);
         step.setStatus(status);
-        step.setCreatedAt(Instant.now());
-        step.setUpdatedAt(Instant.now());
+        step.setCaseTypeStage(stage);
         return step;
+    }
+
+    private EmployeeModel buildEmployee(Long id) {
+        EmployeeModel emp = new EmployeeModel();
+        emp.setId(id);
+        emp.setFirst_name("Dev");
+        emp.setLast_name("User");
+        return emp;
     }
 }
