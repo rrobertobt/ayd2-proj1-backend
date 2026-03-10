@@ -112,7 +112,8 @@ public class UserController {
             })
     @GetMapping("/developers")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasRole('PROJECT_ADMIN')")
+    // @PreAuthorize("hasRole('PROJECT_ADMIN')")
+    @PreAuthorize("hasAnyRole('PROJECT_ADMIN', 'SYSTEM_ADMIN')")
     public List<UserDTO> getDevelopers(
             @Parameter(description = "Búsqueda parcial por nombre completo")
             @RequestParam(required = false) String fullName) {

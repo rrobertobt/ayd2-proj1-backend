@@ -26,7 +26,7 @@ class LoginControllerTest {
         LoginDTO loginDTO = new LoginDTO("alice", "password123");
         UserDTO.RoleInfoDTO roleDTO = new UserDTO.RoleInfoDTO(1L, "DEVELOPER", "Developer");
         LoginResponseDTO expected = new LoginResponseDTO(
-                "alice", "alice@mail.com", true, "jwt-token", roleDTO, null);
+                "alice", "alice@mail.com", true, true, "jwt-token", roleDTO, null);
         when(loginService.login(loginDTO)).thenReturn(expected);
 
         LoginResponseDTO result = loginController.login(loginDTO);
