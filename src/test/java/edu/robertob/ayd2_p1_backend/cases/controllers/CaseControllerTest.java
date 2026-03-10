@@ -224,6 +224,31 @@ class CaseControllerTest {
         assertThrows(BadRequestException.class, () -> caseController.cancelCase(1L, dto));
     }
 
+    // ── getMyAssignedCases ────────────────────────────────────────────────────
+
+    @Test
+    void getMyAssignedCases_delegatesToService() {
+        List<CaseSummaryDTO> expected = List.of(
+                buildSummaryDTO(1L, "Mi caso"),
+                buildSummaryDTO(2L, "Otro caso")
+        );
+        when(caseService.getMyAssignedCases()).thenReturn(expected);
+
+        List<CaseSummaryDTO> result = caseController.getMyAssignedCases();
+
+        assertSame(expected, result);
+        verify(caseService).getMyAssignedCases();
+    }
+
+    @Test
+    void getMyAssignedCases_noAssignedCases_returnsEmptyList() {
+        when(caseService.getMyAssignedCases()).thenReturn(List.of());
+
+        List<CaseSummaryDTO> result = caseController.getMyAssignedCases();
+
+        assertTrue(result.isEmpty());
+    }
+
     // ── builder helpers ───────────────────────────────────────────────────────
 
     private static CaseDTO buildCaseDTO(Long id, String title) {

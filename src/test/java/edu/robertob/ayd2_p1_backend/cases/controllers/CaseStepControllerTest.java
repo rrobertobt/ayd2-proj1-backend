@@ -4,6 +4,7 @@ import edu.robertob.ayd2_p1_backend.cases.models.dto.request.ApproveStepDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.request.AssignStepDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.request.RejectStepDTO;
 import edu.robertob.ayd2_p1_backend.cases.models.dto.response.CaseStepDTO;
+import edu.robertob.ayd2_p1_backend.cases.models.dto.response.WorklogDTO;
 import edu.robertob.ayd2_p1_backend.cases.services.CaseStepService;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
@@ -214,6 +215,59 @@ class CaseStepControllerTest {
     }
 
     // ── builder helpers ───────────────────────────────────────────────────────
+
+    // ── getWorklogs ───────────────────────────────────────────────────────────
+
+    @Test
+    void getWorklogs_delegatesToService() throws Exception {
+        List<WorklogDTO> expected = List.of(
+                buildWorklogDTO(300L, 200L),
+                buildWorklogDTO(301L, 200L)
+        );
+        when(caseStepService.getWorklogs(1L, 200L)).thenReturn(expected);
+
+        List<WorklogDTO> result = caseStepController.getWorklogs(1L, 200L);
+
+        assertSame(expected, result);
+        verify(caseStepService).getWorklogs(1L, 200L);
+    }
+
+    @Test
+    void getWorklogs_emptyStep_returnsEmptyList() throws Exception {
+        when(caseStepService.getWorklogs(1L, 200L)).thenReturn(List.of());
+
+        List<WorklogDTO> result = caseStepController.getWorklogs(1L, 200L);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getWorklogs_caseNotFound_propagatesNotFoundException() throws Exception {
+        when(caseStepService.getWorklogs(99L, 200L))
+                .thenThrow(new NotFoundException("Caso no encontrado"));
+
+        assertThrows(NotFoundException.class,
+                () -> caseStepController.getWorklogs(99L, 200L));
+    }
+
+    @Test
+    void getWorklogs_stepNotFound_propagatesNotFoundException() throws Exception {
+        when(caseStepService.getWorklogs(1L, 999L))
+                .thenThrow(new NotFoundException("Paso no encontrado"));
+
+        assertThrows(NotFoundException.class,
+                () -> caseStepController.getWorklogs(1L, 999L));
+    }
+
+    // ── builder helpers ───────────────────────────────────────────────────────
+
+    private static WorklogDTO buildWorklogDTO(Long id, Long stepId) {
+        return new WorklogDTO(
+                id, stepId, 11L, "Ana García",
+                "Comentario de trabajo", 3.0,
+                Instant.now(), Instant.now()
+        );
+    }
 
     private static CaseStepDTO buildStepDTO(Long id, int stepOrder, String status) {
         return new CaseStepDTO(

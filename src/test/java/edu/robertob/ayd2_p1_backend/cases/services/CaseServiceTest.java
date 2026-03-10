@@ -636,6 +636,71 @@ class CaseServiceTest {
         assertEquals("Mi razón", ticket.getCancelReason());
     }
 
+    // ── getMyAssignedCases ────────────────────────────────────────────────────
+
+    @Test
+    void getMyAssignedCases_returnsCasesWhereEmployeeHasSteps() {
+        EmployeeModel employee = buildEmployee(10L, "Juan", "Pérez", "admin_user");
+        ProjectModel project = buildProject(1L, "P");
+        CaseTypeModel caseType = buildCaseType(2L, "Bug");
+        CaseTicketModel ticket1 = buildTicket(1L, project, caseType, employee,
+                "Caso A", CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
+        CaseTicketModel ticket2 = buildTicket(2L, project, caseType, employee,
+                "Caso B", CaseStatusEnum.OPEN, LocalDate.now().plusDays(10));
+
+        when(employeeRepository.findByUserUsername("admin_user")).thenReturn(Optional.of(employee));
+        when(caseStepRepository.findDistinctCaseIdsByAssignedEmployeeId(10L))
+                .thenReturn(List.of(1L, 2L));
+        when(caseTicketRepository.findAllById(List.of(1L, 2L)))
+                .thenReturn(List.of(ticket1, ticket2));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(anyLong()))
+                .thenReturn(List.of());
+
+        List<CaseSummaryDTO> result = caseService.getMyAssignedCases();
+
+        assertEquals(2, result.size());
+        assertEquals("Caso A", result.get(0).title());
+        assertEquals("Caso B", result.get(1).title());
+    }
+
+    @Test
+    void getMyAssignedCases_noAssignedSteps_returnsEmptyList() {
+        EmployeeModel employee = buildEmployee(10L, "Juan", "Pérez", "admin_user");
+
+        when(employeeRepository.findByUserUsername("admin_user")).thenReturn(Optional.of(employee));
+        when(caseStepRepository.findDistinctCaseIdsByAssignedEmployeeId(10L))
+                .thenReturn(List.of());
+
+        List<CaseSummaryDTO> result = caseService.getMyAssignedCases();
+
+        assertTrue(result.isEmpty());
+        verify(caseTicketRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getMyAssignedCases_includesProgressAndOverdueMeta() {
+        EmployeeModel employee = buildEmployee(10L, "Juan", "Pérez", "admin_user");
+        ProjectModel project = buildProject(1L, "P");
+        CaseTypeModel caseType = buildCaseType(2L, "Bug");
+        CaseTicketModel ticket = buildTicket(1L, project, caseType, employee,
+                "Overdue", CaseStatusEnum.IN_PROGRESS, LocalDate.now().minusDays(1));
+        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
+        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.APPROVED);
+
+        when(employeeRepository.findByUserUsername("admin_user")).thenReturn(Optional.of(employee));
+        when(caseStepRepository.findDistinctCaseIdsByAssignedEmployeeId(10L))
+                .thenReturn(List.of(1L));
+        when(caseTicketRepository.findAllById(List.of(1L))).thenReturn(List.of(ticket));
+        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
+                .thenReturn(List.of(step));
+
+        List<CaseSummaryDTO> result = caseService.getMyAssignedCases();
+
+        assertEquals(1, result.size());
+        assertTrue(result.get(0).overdue());
+        assertEquals(100, result.get(0).progressPercent());
+    }
+
     // ── builder helpers ───────────────────────────────────────────────────────
 
     private static CreateCaseDTO buildCreateDTO(Long projectId, Long caseTypeId,

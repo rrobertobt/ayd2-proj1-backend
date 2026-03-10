@@ -196,6 +196,25 @@ public class CaseService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // READ - my assigned cases (DEVELOPER)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<CaseSummaryDTO> getMyAssignedCases() {
+        EmployeeModel employee = resolveCurrentEmployee();
+        List<Long> caseIds = caseStepRepository
+                .findDistinctCaseIdsByAssignedEmployeeId(employee.getId());
+        if (caseIds.isEmpty()) return List.of();
+        return caseTicketRepository.findAllById(caseIds).stream()
+                .map(ticket -> {
+                    List<CaseStepModel> steps =
+                            caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(ticket.getId());
+                    return toSummaryDTO(ticket, steps);
+                })
+                .toList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // READ - alerts (overdue and near-due cases)
     // ─────────────────────────────────────────────────────────────────────────
 

@@ -229,12 +229,15 @@ public class CaseStepService {
                     "Solo el desarrollador asignado al paso puede registrar trabajo");
         }
 
-        // Transition ASSIGNED → IN_PROGRESS on first worklog
+        // Record when work actually started (only on first worklog)
         if (step.getStatus() == CaseStepStatusEnum.ASSIGNED) {
-            step.setStatus(CaseStepStatusEnum.IN_PROGRESS);
             step.setStartedAt(Instant.now());
-            caseStepRepository.save(step);
         }
+
+        // Developer is submitting their work for review
+        step.setStatus(CaseStepStatusEnum.SUBMITTED);
+        step.setSubmittedAt(Instant.now());
+        caseStepRepository.save(step);
 
         WorkLogModel worklog = new WorkLogModel();
         worklog.setCaseStep(step);
@@ -244,6 +247,18 @@ public class CaseStepService {
 
         WorkLogModel saved = workLogRepository.save(worklog);
         return toWorklogDTO(saved);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET worklogs of a step
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<WorklogDTO> getWorklogs(Long caseId, Long stepId) throws NotFoundException {
+        findCaseById(caseId);
+        findStepByCaseAndId(caseId, stepId);
+        return workLogRepository.findByCaseStepIdOrderByCreatedAtAsc(stepId)
+                .stream().map(this::toWorklogDTO).toList();
     }
 
     private WorklogDTO toWorklogDTO(WorkLogModel worklog) {

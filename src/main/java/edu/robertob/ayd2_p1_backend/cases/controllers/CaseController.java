@@ -108,6 +108,22 @@ public class CaseController {
     }
 
     @Operation(
+            summary = "Ver mis casos asignados",
+            description = "Retorna todos los casos donde el desarrollador autenticado tiene al menos un paso asignado. " +
+                    "Solo accesible para DEVELOPER.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lista de casos asignados"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @GetMapping("/api/v1/cases/my-assigned")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('DEVELOPER')")
+    public List<CaseSummaryDTO> getMyAssignedCases() {
+        return caseService.getMyAssignedCases();
+    }
+
+    @Operation(
             summary = "Casos próximos a vencer y vencidos (alertas)",
             description = """
                     Devuelve casos con fecha límite en los próximos 3 días o ya vencidos.

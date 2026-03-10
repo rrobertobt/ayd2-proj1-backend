@@ -115,6 +115,27 @@ public class CaseStepController {
     }
 
     @Operation(
+            summary = "Ver worklogs de un paso",
+            description = """
+                    Retorna todos los registros de trabajo de un paso, ordenados cronológicamente.
+                    Útil para que el admin consulte el historial antes de aprobar o rechazar.
+                    Accesible para PROJECT_ADMIN y DEVELOPER.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lista de worklogs"),
+                    @ApiResponse(responseCode = "404", description = "Caso o paso no encontrado"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @GetMapping("/api/v1/cases/{caseId}/steps/{stepId}/worklogs")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('PROJECT_ADMIN', 'DEVELOPER')")
+    public List<WorklogDTO> getWorklogs(@PathVariable Long caseId,
+                                        @PathVariable Long stepId) throws NotFoundException {
+        return caseStepService.getWorklogs(caseId, stepId);
+    }
+
+    @Operation(
             summary = "Registrar trabajo en un paso",
             description = """
                     Registra horas trabajadas y un comentario en un paso.
