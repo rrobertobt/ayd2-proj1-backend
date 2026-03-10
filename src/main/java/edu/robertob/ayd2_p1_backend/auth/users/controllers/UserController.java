@@ -1,5 +1,6 @@
 package edu.robertob.ayd2_p1_backend.auth.users.controllers;
 
+import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.ChangePasswordDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.CreateUserDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.SetPasswordDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.UpdateUserDTO;
@@ -50,6 +51,28 @@ public class UserController {
     public UserMeDTO getAuthenticatedUser(@AuthenticationPrincipal UserDetails userDetails)
             throws NotFoundException {
         return userService.getMeByUsername(userDetails.getUsername());
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PATCH /me/password  – change own password (any authenticated user)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Operation(
+            summary = "Cambiar contraseña del usuario autenticado",
+            description = "Permite al usuario autenticado cambiar su propia contraseña. "
+                    + "Requiere proporcionar la contraseña actual para confirmar la identidad.",
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "Contraseña actualizada exitosamente"),
+                    @ApiResponse(responseCode = "400", description = "Contraseña actual incorrecta o confirmación no coincide"),
+                    @ApiResponse(responseCode = "401", description = "Token inválido o no proporcionado")
+            })
+    @PatchMapping("/me/password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestBody @Valid ChangePasswordDTO dto) throws NotFoundException {
+        userService.changePassword(userDetails.getUsername(), dto);
     }
 
     // ─────────────────────────────────────────────────────────────────────────

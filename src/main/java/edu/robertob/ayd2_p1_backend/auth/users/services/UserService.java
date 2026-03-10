@@ -2,12 +2,15 @@ package edu.robertob.ayd2_p1_backend.auth.users.services;
 
 import edu.robertob.ayd2_p1_backend.auth.roles.models.entities.RoleModel;
 import edu.robertob.ayd2_p1_backend.auth.users.mappers.UserMapper;
+import edu.robertob.ayd2_p1_backend.auth.users.models.dto.request.ChangePasswordDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.dto.response.UserMeDTO;
 import edu.robertob.ayd2_p1_backend.auth.users.models.entities.EmployeeModel;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.EmployeeRepository;
 import edu.robertob.ayd2_p1_backend.auth.users.repositories.UserRepository;
+import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +25,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Busca un usuario por su ID.
@@ -81,5 +85,29 @@ public class UserService {
 
     public Long count() {
         return userRepository.count();
+    }
+
+    /**
+     * Cambia la contraseña del usuario autenticado.
+     * Verifica que la contraseña actual sea correcta y que la nueva coincida con la confirmación.
+     *
+     * @param username    nombre de usuario del usuario autenticado (extraído del JWT)
+     * @param dto         DTO con contraseña actual, nueva contraseña y confirmación
+     * @throws NotFoundException   si el usuario no existe
+     * @throws BadRequestException si la contraseña actual es incorrecta o las nuevas no coinciden
+     */
+    public void changePassword(String username, ChangePasswordDTO dto) throws NotFoundException {
+        if (!dto.getNewPassword().equals(dto.getConfirmNewPassword())) {
+            throw new BadRequestException("La nueva contraseña y su confirmación no coinciden.");
+        }
+
+        UserModel user = getUserByUsername(username);
+
+        if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword_hash())) {
+            throw new BadRequestException("La contraseña actual es incorrecta.");
+        }
+
+        user.setPassword_hash(passwordEncoder.encode(dto.getNewPassword()));
+        userRepository.save(user);
     }
 }
