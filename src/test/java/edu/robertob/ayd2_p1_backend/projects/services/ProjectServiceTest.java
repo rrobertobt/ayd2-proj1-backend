@@ -187,8 +187,6 @@ class ProjectServiceTest {
         ProjectFilterDTO filter = new ProjectFilterDTO();
         filter.setPage(2);
         filter.setSize(5);
-        filter.setSortBy("name");
-        filter.setSortDir("asc");
 
         projectService.getProjects(filter);
 
@@ -244,22 +242,6 @@ class ProjectServiceTest {
         assertEquals(5L, result.content().get(0).currentAdmin().assignmentId());
         assertEquals("John", result.content().get(0).currentAdmin().firstName());
         assertEquals("Doe", result.content().get(0).currentAdmin().lastName());
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getProjects_unknownSortBy_defaultsToCreatedAt() {
-        Page<ProjectModel> mockPage = new PageImpl<>(List.of());
-        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        when(projectRepository.findAll(any(Specification.class), pageableCaptor.capture())).thenReturn(mockPage);
-
-        ProjectFilterDTO filter = new ProjectFilterDTO();
-        filter.setSortBy("nonExistentField");
-
-        projectService.getProjects(filter);
-
-        // Should not throw; defaults to createdAt
-        verify(projectRepository).findAll(any(Specification.class), any(Pageable.class));
     }
 
     @Test

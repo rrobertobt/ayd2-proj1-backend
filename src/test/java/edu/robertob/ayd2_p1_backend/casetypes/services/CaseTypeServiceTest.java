@@ -137,8 +137,6 @@ class CaseTypeServiceTest {
         CaseTypeFilterDTO filter = new CaseTypeFilterDTO();
         filter.setPage(1);
         filter.setSize(5);
-        filter.setSortBy("name");
-        filter.setSortDir("asc");
 
         caseTypeService.getAllCaseTypes(filter);
 

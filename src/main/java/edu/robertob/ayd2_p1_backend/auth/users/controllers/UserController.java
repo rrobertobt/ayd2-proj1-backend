@@ -142,8 +142,6 @@ public class UserController {
                     **Paginación:**
                     - `page` – número de página (inicia en 0, default: 0)
                     - `size` – tamaño de página (default: 10, máximo: 100)
-                    - `sortBy` – campo de ordenamiento: `username` | `email` | `active` | `createdAt` | `firstName` | `lastName` | `hourlyRate` (default: `createdAt`)
-                    - `sortDir` – dirección: `asc` | `desc` (default: `desc`)
                     """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
