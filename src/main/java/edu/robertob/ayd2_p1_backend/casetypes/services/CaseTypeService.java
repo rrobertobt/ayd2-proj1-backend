@@ -17,24 +17,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(rollbackFor = Exception.class)
 @Slf4j
 public class CaseTypeService {
-
-    private static final Map<String, String> SORT_FIELD_MAP = Map.of(
-            "name",      "name",
-            "createdAt", "createdAt"
-    );
 
     private final CaseTypeRepository caseTypeRepository;
     private final CaseTypeStageRepository stageRepository;
@@ -58,12 +51,9 @@ public class CaseTypeService {
 
     @Transactional(readOnly = true)
     public PagedResponseDTO<CaseTypeDTO> getAllCaseTypes(CaseTypeFilterDTO filter) {
-        String sortField = SORT_FIELD_MAP.getOrDefault(filter.getSortBy(), "createdAt");
-        Sort sort = Sort.by(filter.direction(), sortField);
         Pageable pageable = PageRequest.of(
                 Math.max(filter.getPage(), 0),
-                Math.min(Math.max(filter.getSize(), 1), 100),
-                sort
+                Math.min(Math.max(filter.getSize(), 1), 100)
         );
 
         Page<CaseTypeModel> page = caseTypeRepository.findAll(

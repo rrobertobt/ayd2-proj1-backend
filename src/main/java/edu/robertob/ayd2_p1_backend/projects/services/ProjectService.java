@@ -24,7 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -34,7 +33,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -43,12 +41,6 @@ import java.util.Set;
 @Transactional(rollbackFor = Exception.class)
 @Slf4j
 public class ProjectService {
-
-    private static final Map<String, String> SORT_FIELD_MAP = Map.of(
-            "name",      "name",
-            "status",    "status",
-            "createdAt", "createdAt"
-    );
 
     private final ProjectRepository projectRepository;
     private final ProjectAdminAssignmentRepository assignmentRepository;
@@ -83,12 +75,9 @@ public class ProjectService {
             }
         }
 
-        String sortField = SORT_FIELD_MAP.getOrDefault(filter.getSortBy(), "createdAt");
-        Sort sort = Sort.by(filter.direction(), sortField);
         Pageable pageable = PageRequest.of(
                 Math.max(filter.getPage(), 0),
-                Math.min(Math.max(filter.getSize(), 1), 100),
-                sort
+                Math.min(Math.max(filter.getSize(), 1), 100)
         );
 
         Page<ProjectModel> page = projectRepository.findAll(

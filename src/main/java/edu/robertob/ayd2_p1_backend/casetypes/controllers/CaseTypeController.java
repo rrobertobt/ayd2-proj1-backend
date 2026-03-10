@@ -56,8 +56,6 @@ public class CaseTypeController {
                     **Paginación:**
                     - `page` – número de página (inicia en 0, default: 0)
                     - `size` – tamaño de página (default: 10, máximo: 100)
-                    - `sortBy` – campo de ordenamiento: `name` | `createdAt` (default: `createdAt`)
-                    - `sortDir` – dirección: `asc` | `desc` (default: `desc`)
                     """,
             security = @SecurityRequirement(name = "bearerAuth"),
             responses = {

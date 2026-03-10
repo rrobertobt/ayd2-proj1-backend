@@ -64,6 +64,7 @@ public class LoginService {
                     userDTO.username(),
                     userDTO.email(),
                     userDTO.active(),
+                    userDTO.onboardingCompleted(),
                     token,
                     userDTO.role(),
                     userDTO.employee()

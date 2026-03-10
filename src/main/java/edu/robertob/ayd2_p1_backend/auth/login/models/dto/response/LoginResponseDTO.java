@@ -6,6 +6,7 @@ public record LoginResponseDTO(
         String username,
         String email,
         boolean active,
+        boolean onboardingCompleted,
         String token,
         UserDTO.RoleInfoDTO role,
         UserDTO.EmployeeDTO employee

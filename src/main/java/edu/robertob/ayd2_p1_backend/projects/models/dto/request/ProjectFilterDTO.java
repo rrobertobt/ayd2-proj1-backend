@@ -2,7 +2,6 @@ package edu.robertob.ayd2_p1_backend.projects.models.dto.request;
 
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.data.domain.Sort;
 
 /**
  * Query-parameter filter bag for the project listing endpoint.
@@ -23,14 +22,4 @@ public class ProjectFilterDTO {
     private int page = 0;
 
     private int size = 10;
-
-    /** Field to sort by: name | status | createdAt */
-    private String sortBy = "createdAt";
-
-    /** Sort direction: asc | desc */
-    private String sortDir = "desc";
-
-    public Sort.Direction direction() {
-        return "asc".equalsIgnoreCase(sortDir) ? Sort.Direction.ASC : Sort.Direction.DESC;
-    }
 }

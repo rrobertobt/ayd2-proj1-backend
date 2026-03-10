@@ -27,7 +27,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +39,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -125,20 +123,6 @@ public class UserManagementService {
         return userMapper.userToUserDTO(savedUser, savedEmployee);
     }
 
-    // ── employee-side sort fields that live on the joined entity ─────────────
-    private static final Set<String> EMPLOYEE_SORT_FIELDS =
-            Set.of("firstName", "lastName", "hourlyRate");
-
-    // ── user-entity field name mapping ────────────────────────────────────────
-    private static final Map<String, String> SORT_FIELD_MAP = Map.of(
-            "username",   "username",
-            "email",      "email",
-            "active",     "active",
-            "createdAt",  "createdAt",
-            "firstName",  "first_name",
-            "lastName",   "last_name",
-            "hourlyRate", "hourly_rate"
-    );
 
     // ─────────────────────────────────────────────────────────────────────────
     // READ  –  developers list (no pagination)
@@ -171,25 +155,14 @@ public class UserManagementService {
     /**
      * Returns a paginated, filtered list of users.
      *
-     * @param filter query params (search, firstName, lastName, email, roleId, active, page, size, sortBy, sortDir)
+     * @param filter query params (search, firstName, lastName, email, roleId, active, page, size)
      */
     @Transactional(readOnly = true)
     public PagedResponseDTO<UserDTO> getUsers(UserFilterDTO filter) {
 
-        String rawSortField = SORT_FIELD_MAP.getOrDefault(filter.getSortBy(), "createdAt");
-        boolean isEmployeeSort = EMPLOYEE_SORT_FIELDS.contains(filter.getSortBy());
-
-        // For employee-side sorting we sort in-memory after fetching the page,
-        // because the JPA column lives on the joined table. For user-side fields
-        // we let the DB handle it.
-        Sort sort = isEmployeeSort
-                ? Sort.unsorted()
-                : Sort.by(filter.direction(), rawSortField);
-
         Pageable pageable = PageRequest.of(
                 Math.max(filter.getPage(), 0),
-                Math.min(Math.max(filter.getSize(), 1), 100),
-                sort
+                Math.min(Math.max(filter.getSize(), 1), 100)
         );
 
         Page<UserModel> page = userRepository.findAll(UserSpecification.from(filter), pageable);
