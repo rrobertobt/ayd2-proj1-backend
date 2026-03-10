@@ -408,6 +408,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step1));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step1)).thenReturn(step1);
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
                 .thenReturn(List.of(step1, step2));
@@ -439,6 +440,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
                 .thenReturn(List.of(step));
@@ -466,6 +468,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
                 .thenReturn(List.of(step));
@@ -491,6 +494,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L)).thenReturn(List.of(step));
         when(caseTicketRepository.save(ticket)).thenReturn(ticket);
@@ -561,6 +565,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
 
         CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
@@ -586,6 +591,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
 
         CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
@@ -609,6 +615,7 @@ class CaseStepServiceTest {
 
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
+        when(workLogRepository.existsByCaseStepId(200L)).thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
 
         CaseStepDTO result = caseStepService.rejectStep(1L, 200L, dto);
