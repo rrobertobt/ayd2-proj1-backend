@@ -33,10 +33,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import edu.robertob.ayd2_p1_backend.auth.users.enums.RolesEnum;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -137,6 +139,30 @@ public class UserManagementService {
             "lastName",   "last_name",
             "hourlyRate", "hourly_rate"
     );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // READ  –  developers list (no pagination)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns all active DEVELOPER users, optionally filtered by full name.
+     *
+     * @param fullName optional partial match on "firstName lastName" or "lastName firstName"
+     * @return list of matching developers
+     */
+    @Transactional(readOnly = true)
+    public List<UserDTO> getDevelopers(String fullName) {
+        UserFilterDTO filter = new UserFilterDTO();
+        filter.setRoleCode(RolesEnum.DEVELOPER);
+        filter.setFullName(fullName);
+
+        return userRepository.findAll(UserSpecification.from(filter)).stream()
+                .map(u -> {
+                    EmployeeModel emp = employeeRepository.findByUserId(u.getId()).orElse(null);
+                    return userMapper.userToUserDTO(u, emp);
+                })
+                .toList();
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // READ  –  paginated + filtered list

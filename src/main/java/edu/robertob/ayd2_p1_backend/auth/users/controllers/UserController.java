@@ -11,6 +11,7 @@ import edu.robertob.ayd2_p1_backend.auth.users.services.UserService;
 import edu.robertob.ayd2_p1_backend.core.exceptions.InvalidTokenException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 import edu.robertob.ayd2_p1_backend.core.models.entities.response.PagedResponseDTO;
+import java.util.List;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -67,6 +68,32 @@ public class UserController {
     public void setPasswordFromOnboarding(@RequestBody @Valid SetPasswordDTO dto)
             throws InvalidTokenException {
         userManagementService.setPasswordFromOnboarding(dto);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROJECT_ADMIN – developers lookup for case-step assignment
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @Operation(
+            summary = "Listar developers",
+            description = """
+                    Devuelve todos los usuarios con rol DEVELOPER. Accesible para PROJECT_ADMIN.
+
+                    **Filtro disponible (query param):**
+                    - `fullName` – búsqueda parcial en nombre completo ("nombre apellido" o "apellido nombre")
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth"),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Lista de developers"),
+                    @ApiResponse(responseCode = "403", description = "Acceso denegado")
+            })
+    @GetMapping("/developers")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('PROJECT_ADMIN')")
+    public List<UserDTO> getDevelopers(
+            @Parameter(description = "Búsqueda parcial por nombre completo")
+            @RequestParam(required = false) String fullName) {
+        return userManagementService.getDevelopers(fullName);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
