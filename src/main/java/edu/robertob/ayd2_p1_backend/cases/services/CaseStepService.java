@@ -18,7 +18,6 @@ import edu.robertob.ayd2_p1_backend.cases.repositories.CaseTicketRepository;
 import edu.robertob.ayd2_p1_backend.cases.repositories.WorkLogRepository;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
-import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -40,7 +39,6 @@ public class CaseStepService {
     private final CaseTicketRepository caseTicketRepository;
     private final CaseStepRepository caseStepRepository;
     private final EmployeeRepository employeeRepository;
-    private final ProjectMemberRepository projectMemberRepository;
     private final WorkLogRepository workLogRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -73,13 +71,6 @@ public class CaseStepService {
         }
 
         EmployeeModel employee = findEmployeeByUserId(dto.getUserId());
-
-        if (!projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(
-                ticket.getProject().getId(), employee.getId())) {
-            throw new BadRequestException(
-                    "El usuario con ID " + dto.getUserId() +
-                    " no es miembro activo del proyecto.");
-        }
 
         step.setAssignedEmployee(employee);
         step.setStatus(CaseStepStatusEnum.ASSIGNED);
@@ -126,13 +117,6 @@ public class CaseStepService {
             // There is a next step – assign it if nextAssigneeUserId provided
             if (dto.getNextAssigneeUserId() != null) {
                 EmployeeModel nextEmployee = findEmployeeByUserId(dto.getNextAssigneeUserId());
-
-                if (!projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(
-                        ticket.getProject().getId(), nextEmployee.getId())) {
-                    throw new BadRequestException(
-                            "El usuario con ID " + dto.getNextAssigneeUserId() +
-                            " no es miembro activo del proyecto.");
-                }
 
                 CaseStepModel next = nextStep.get();
                 next.setAssignedEmployee(nextEmployee);

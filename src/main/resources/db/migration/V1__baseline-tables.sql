@@ -53,7 +53,7 @@ CREATE TABLE projects
     id          BIGSERIAL PRIMARY KEY,
     name        VARCHAR(200) NOT NULL,
     description TEXT,
-    status      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE', -- texto controlado: ACTIVE/INACTIVE
+    status      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE', : ACTIVE/INACTIVE
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     CONSTRAINT project_status_chk CHECK (status IN ('ACTIVE', 'INACTIVE'))
@@ -75,23 +75,6 @@ CREATE TABLE project_admin_assignment
 -- 1 admin activo por proyecto (Postgres partial unique index)
 CREATE UNIQUE INDEX uq_project_admin_active
     ON project_admin_assignment (project_id) WHERE active = TRUE;
-
-CREATE TABLE project_members
-(
-    id          BIGSERIAL PRIMARY KEY,
-    project_id  BIGINT  NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
-    employee_id BIGINT  NOT NULL REFERENCES employees (id),
-    start_date  DATE    NOT NULL DEFAULT CURRENT_DATE,
-    end_date    DATE,
-    active      BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT pm_dates_chk CHECK (end_date IS NULL OR end_date >= start_date)
-);
-
--- evita duplicados de membership
-CREATE UNIQUE INDEX uq_project_member
-    ON project_members (project_id, employee_id);
 
 -- ----------------------------
 -- 3) Tipos de caso y workflow
@@ -127,7 +110,6 @@ CREATE UNIQUE INDEX uq_case_type_stage_order
 -- 4) Casos y ejecución
 -- ----------------------------
 
--- "case" es palabra reservada en muchos contextos; recomiendo llamarla "case_ticket"
 CREATE TABLE case_tickets
 (
     id                     BIGSERIAL PRIMARY KEY,
@@ -136,7 +118,7 @@ CREATE TABLE case_tickets
     created_by_employee_id BIGINT       NOT NULL REFERENCES employees (id),
     title                  VARCHAR(250) NOT NULL,
     description            TEXT,
-    status                 VARCHAR(30)  NOT NULL DEFAULT 'OPEN', -- texto controlado
+    status                 VARCHAR(30)  NOT NULL DEFAULT 'OPEN', 
     due_date               DATE         NOT NULL,
     created_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -155,7 +137,7 @@ CREATE TABLE case_steps
     case_id              BIGINT      NOT NULL REFERENCES case_tickets (id) ON DELETE CASCADE,
     case_type_stage_id   BIGINT      NOT NULL REFERENCES case_type_stages (id),
     step_order           INT         NOT NULL,
-    status               VARCHAR(30) NOT NULL DEFAULT 'PENDING', -- texto controlado
+    status               VARCHAR(30) NOT NULL DEFAULT 'PENDING', 
     assigned_employee_id BIGINT REFERENCES employees (id),
     assigned_at          TIMESTAMPTZ,
     started_at           TIMESTAMPTZ,
@@ -196,7 +178,7 @@ CREATE TABLE work_logs
 );
 
 -- ----------------------------
--- 5) Auditoría (recomendado)
+-- 5) Auditoría
 -- ----------------------------
 
 CREATE TABLE audit_logs
@@ -239,13 +221,6 @@ CREATE INDEX idx_work_log_employee_created
 -- 6) WorkLogs por step (detalle de paso / auditoría)
 CREATE INDEX idx_work_log_step
     ON work_logs (case_step_id);
-
--- 7) Membresía activa rápida (validar elegibilidad)
-CREATE INDEX idx_project_member_project_active
-    ON project_members (project_id, active);
-
-CREATE INDEX idx_project_member_employee_active
-    ON project_members (employee_id, active);
 
 -- 8) Auditoría por entidad
 CREATE INDEX idx_audit_entity

@@ -17,7 +17,6 @@ import edu.robertob.ayd2_p1_backend.projects.models.dto.response.ProjectDTO;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectAdminAssignmentModel;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectAdminAssignmentRepository;
-import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectSpecification;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +52,6 @@ public class ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectAdminAssignmentRepository assignmentRepository;
-    private final ProjectMemberRepository projectMemberRepository;
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
 
@@ -150,8 +148,7 @@ public class ProjectService {
             projects = assignmentRepository.findByEmployeeIdAndActiveTrue(employee.getId())
                     .stream().map(ProjectAdminAssignmentModel::getProject).toList();
         } else {
-            projects = projectMemberRepository.findByEmployeeIdAndActiveTrue(employee.getId())
-                    .stream().map(a -> a.getProject()).toList();
+            projects = projectRepository.findAll();
         }
 
         return projects.stream()

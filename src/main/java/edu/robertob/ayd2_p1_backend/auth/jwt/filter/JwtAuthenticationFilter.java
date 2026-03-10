@@ -113,7 +113,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         User user = new User(username, "", List.of(new SimpleGrantedAuthority(userType)));
 
         if (jwtTokenInspector.isTokenValid(jwt)) {
-            log.info("Usuario autenticado exitosamente: {}", username);
             return Optional.of(user);
         }
 

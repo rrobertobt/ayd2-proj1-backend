@@ -18,7 +18,6 @@ import edu.robertob.ayd2_p1_backend.casetypes.models.entities.CaseTypeStageModel
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
-import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,7 +39,6 @@ class CaseStepServiceTest {
     @Mock private CaseTicketRepository caseTicketRepository;
     @Mock private CaseStepRepository caseStepRepository;
     @Mock private EmployeeRepository employeeRepository;
-    @Mock private ProjectMemberRepository projectMemberRepository;
 
     @InjectMocks
     private CaseStepService caseStepService;
@@ -133,8 +131,6 @@ class CaseStepServiceTest {
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
         when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 11L))
-                .thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
         when(caseTicketRepository.save(ticket)).thenReturn(ticket);
 
@@ -164,8 +160,6 @@ class CaseStepServiceTest {
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
         when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 11L))
-                .thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
         when(caseTicketRepository.save(ticket)).thenReturn(ticket);
 
@@ -192,38 +186,11 @@ class CaseStepServiceTest {
         when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
         when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
         when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(assignee));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 11L))
-                .thenReturn(true);
         when(caseStepRepository.save(step)).thenReturn(step);
 
         caseStepService.assignStep(1L, 200L, dto);
 
         verify(caseTicketRepository, never()).save(any());
-    }
-
-    @Test
-    void assignStep_employeeNotMember_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel outsider = buildEmployee(20L, "Outsider", "User");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.OPEN, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage = buildStage(100L, caseType, "Stage", 1);
-        CaseStepModel step = buildStep(200L, ticket, stage, 1, CaseStepStatusEnum.PENDING);
-
-        AssignStepDTO dto = new AssignStepDTO();
-        dto.setUserId(45L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step));
-        when(employeeRepository.findByUserId(45L)).thenReturn(Optional.of(outsider));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 20L))
-                .thenReturn(false);
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.assignStep(1L, 200L, dto));
-        verify(caseStepRepository, never()).save(any());
     }
 
     @Test
@@ -340,8 +307,6 @@ class CaseStepServiceTest {
         when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
                 .thenReturn(List.of(step1, step2));
         when(employeeRepository.findByUserId(50L)).thenReturn(Optional.of(nextEmployee));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 11L))
-                .thenReturn(true);
         when(caseStepRepository.save(step2)).thenReturn(step2);
         when(caseStepRepository.findById(200L)).thenReturn(Optional.of(step1));
 
@@ -447,35 +412,6 @@ class CaseStepServiceTest {
 
         assertThrows(BadRequestException.class,
                 () -> caseStepService.approveStep(1L, 200L, new ApproveStepDTO()));
-    }
-
-    @Test
-    void approveStep_nextAssigneeNotMember_throwsBadRequestException() {
-        ProjectModel project = buildProject(1L, "P");
-        CaseTypeModel caseType = buildCaseType(2L, "Bug");
-        EmployeeModel creator = buildEmployee(10L, "Juan", "Pérez");
-        EmployeeModel outsider = buildEmployee(20L, "Outsider", "User");
-        CaseTicketModel ticket = buildTicket(1L, project, caseType, creator,
-                CaseStatusEnum.IN_PROGRESS, LocalDate.now().plusDays(5));
-        CaseTypeStageModel stage1 = buildStage(100L, caseType, "S1", 1);
-        CaseTypeStageModel stage2 = buildStage(101L, caseType, "S2", 2);
-        CaseStepModel step1 = buildStep(200L, ticket, stage1, 1, CaseStepStatusEnum.SUBMITTED);
-        CaseStepModel step2 = buildStep(201L, ticket, stage2, 2, CaseStepStatusEnum.PENDING);
-
-        ApproveStepDTO dto = new ApproveStepDTO();
-        dto.setNextAssigneeUserId(50L);
-
-        when(caseTicketRepository.findById(1L)).thenReturn(Optional.of(ticket));
-        when(caseStepRepository.findByIdAndCaseTicketId(200L, 1L)).thenReturn(Optional.of(step1));
-        when(caseStepRepository.save(step1)).thenReturn(step1);
-        when(caseStepRepository.findByCaseTicketIdOrderByStepOrderAsc(1L))
-                .thenReturn(List.of(step1, step2));
-        when(employeeRepository.findByUserId(50L)).thenReturn(Optional.of(outsider));
-        when(projectMemberRepository.existsByProjectIdAndEmployeeIdAndActiveTrue(1L, 20L))
-                .thenReturn(false);
-
-        assertThrows(BadRequestException.class,
-                () -> caseStepService.approveStep(1L, 200L, dto));
     }
 
     @Test

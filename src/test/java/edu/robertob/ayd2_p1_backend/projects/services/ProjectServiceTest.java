@@ -18,7 +18,6 @@ import edu.robertob.ayd2_p1_backend.projects.models.dto.response.ProjectDTO;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectAdminAssignmentModel;
 import edu.robertob.ayd2_p1_backend.projects.models.entities.ProjectModel;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectAdminAssignmentRepository;
-import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectMemberRepository;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +48,6 @@ class ProjectServiceTest {
 
     @Mock private ProjectRepository projectRepository;
     @Mock private ProjectAdminAssignmentRepository assignmentRepository;
-    @Mock private ProjectMemberRepository projectMemberRepository;
     @Mock private UserRepository userRepository;
     @Mock private EmployeeRepository employeeRepository;
 
