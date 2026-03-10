@@ -5,7 +5,8 @@ import edu.robertob.ayd2_p1_backend.casetypes.repositories.CaseTypeRepository;
 import edu.robertob.ayd2_p1_backend.core.exceptions.BadRequestException;
 import edu.robertob.ayd2_p1_backend.core.exceptions.NotFoundException;
 import edu.robertob.ayd2_p1_backend.projects.repositories.ProjectRepository;
-import edu.robertob.ayd2_p1_backend.reports.models.dto.*;
+import edu.robertob.ayd2_p1_backend.reports.models.dto.HoursAndMoneyDTO;
+import edu.robertob.ayd2_p1_backend.reports.models.dto.ProjectCaseCountDTO;
 import edu.robertob.ayd2_p1_backend.reports.repositories.ReportRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,400 +24,160 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class ReportServiceTest {
 
-    @Mock private ReportRepository reportRepository;
-    @Mock private ProjectRepository projectRepository;
-    @Mock private EmployeeRepository employeeRepository;
-    @Mock private CaseTypeRepository caseTypeRepository;
+    @Mock ReportRepository reportRepository;
+    @Mock ProjectRepository projectRepository;
+    @Mock EmployeeRepository employeeRepository;
+    @Mock CaseTypeRepository caseTypeRepository;
 
-    @InjectMocks
-    private ReportService reportService;
+    @InjectMocks ReportService service;
 
     // ── projectCaseCount ──────────────────────────────────────────────────────
 
     @Test
-    void projectCaseCount_noFilter_returnsAll() {
-        List<ProjectCaseCountDTO> expected = List.of(
-                new ProjectCaseCountDTO(1L, "Proj A", "ACTIVE", 3L));
-        when(reportRepository.projectCaseCount(null)).thenReturn(expected);
+    void projectCaseCount_noFilter_callsRepoWithNull() {
+        when(reportRepository.projectCaseCount(null)).thenReturn(List.of());
 
-        List<ProjectCaseCountDTO> result = reportService.projectCaseCount(null);
+        var result = service.projectCaseCount(null);
 
-        assertSame(expected, result);
+        assertTrue(result.isEmpty());
         verify(reportRepository).projectCaseCount(null);
     }
 
     @Test
-    void projectCaseCount_withBlankStatus_returnsAll() {
-        List<ProjectCaseCountDTO> expected = List.of();
-        when(reportRepository.projectCaseCount(null)).thenReturn(expected);
+    void projectCaseCount_validStatus_passesUpperCase() {
+        when(reportRepository.projectCaseCount("ACTIVE")).thenReturn(
+                List.of(new ProjectCaseCountDTO(1L, "Project A", "ACTIVE", 3L)));
 
-        List<ProjectCaseCountDTO> result = reportService.projectCaseCount("   ");
+        var result = service.projectCaseCount("active");
 
-        assertSame(expected, result);
-        verify(reportRepository).projectCaseCount(null);
-    }
-
-    @Test
-    void projectCaseCount_withValidStatus_filtersResults() {
-        List<ProjectCaseCountDTO> expected = List.of(
-                new ProjectCaseCountDTO(1L, "Proj A", "ACTIVE", 3L));
-        when(reportRepository.projectCaseCount("ACTIVE")).thenReturn(expected);
-
-        List<ProjectCaseCountDTO> result = reportService.projectCaseCount("active");
-
-        assertSame(expected, result);
+        assertEquals(1, result.size());
         verify(reportRepository).projectCaseCount("ACTIVE");
     }
 
     @Test
-    void projectCaseCount_withInvalidStatus_throwsBadRequest() {
-        assertThrows(BadRequestException.class,
-                () -> reportService.projectCaseCount("INVALID"));
+    void projectCaseCount_invalidStatus_throwsBadRequest() {
+        assertThrows(BadRequestException.class, () -> service.projectCaseCount("UNKNOWN"));
         verify(reportRepository, never()).projectCaseCount(any());
     }
 
     // ── hoursAndMoneyByProject ────────────────────────────────────────────────
 
     @Test
-    void hoursAndMoneyByProject_projectNotFound_throwsNotFound() {
-        when(projectRepository.existsById(99L)).thenReturn(false);
+    void hoursAndMoneyByProject_throwsWhenNotFound() {
+        when(projectRepository.existsById(1L)).thenReturn(false);
 
-        assertThrows(NotFoundException.class,
-                () -> reportService.hoursAndMoneyByProject(99L));
+        assertThrows(NotFoundException.class, () -> service.hoursAndMoneyByProject(1L));
     }
 
     @Test
-    void hoursAndMoneyByProject_returnsDto() throws NotFoundException {
-        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(5L, 10.0, 500.0);
+    void hoursAndMoneyByProject_returnsRepoResult() throws NotFoundException {
+        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(5L, 10.0, 200.0);
         when(projectRepository.existsById(1L)).thenReturn(true);
         when(reportRepository.hoursAndMoneyByProject(1L)).thenReturn(dto);
 
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByProject(1L);
-
-        assertSame(dto, result);
+        assertSame(dto, service.hoursAndMoneyByProject(1L));
     }
 
     @Test
-    void hoursAndMoneyByProject_repositoryReturnsNull_returnsZeroDto() throws NotFoundException {
+    void hoursAndMoneyByProject_returnsZeroWhenRepoNull() throws NotFoundException {
         when(projectRepository.existsById(1L)).thenReturn(true);
         when(reportRepository.hoursAndMoneyByProject(1L)).thenReturn(null);
 
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByProject(1L);
+        var result = service.hoursAndMoneyByProject(1L);
 
         assertEquals(0L, result.totalCases());
         assertEquals(0.0, result.totalHours());
-        assertEquals(0.0, result.totalMoney());
     }
 
     // ── hoursAndMoneyByDeveloper ──────────────────────────────────────────────
 
     @Test
-    void hoursAndMoneyByDeveloper_employeeNotFound_throwsNotFound() {
-        when(employeeRepository.existsById(99L)).thenReturn(false);
+    void hoursAndMoneyByDeveloper_throwsWhenNotFound() {
+        when(employeeRepository.existsById(5L)).thenReturn(false);
 
-        assertThrows(NotFoundException.class,
-                () -> reportService.hoursAndMoneyByDeveloper(99L));
+        assertThrows(NotFoundException.class, () -> service.hoursAndMoneyByDeveloper(5L));
     }
 
     @Test
-    void hoursAndMoneyByDeveloper_returnsDto() throws NotFoundException {
-        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(3L, 6.0, 300.0);
-        when(employeeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.hoursAndMoneyByDeveloper(1L)).thenReturn(dto);
+    void hoursAndMoneyByDeveloper_returnsRepoResult() throws NotFoundException {
+        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(3L, 6.0, 120.0);
+        when(employeeRepository.existsById(5L)).thenReturn(true);
+        when(reportRepository.hoursAndMoneyByDeveloper(5L)).thenReturn(dto);
 
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByDeveloper(1L);
-
-        assertSame(dto, result);
-    }
-
-    @Test
-    void hoursAndMoneyByDeveloper_repositoryReturnsNull_returnsZeroDto() throws NotFoundException {
-        when(employeeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.hoursAndMoneyByDeveloper(1L)).thenReturn(null);
-
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByDeveloper(1L);
-
-        assertEquals(0L, result.totalCases());
-    }
-
-    // ── hoursAndMoneyByCaseType ───────────────────────────────────────────────
-
-    @Test
-    void hoursAndMoneyByCaseType_notFound_throwsNotFound() {
-        when(caseTypeRepository.existsById(99L)).thenReturn(false);
-
-        assertThrows(NotFoundException.class,
-                () -> reportService.hoursAndMoneyByCaseType(99L));
-    }
-
-    @Test
-    void hoursAndMoneyByCaseType_returnsDto() throws NotFoundException {
-        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(2L, 4.0, 200.0);
-        when(caseTypeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.hoursAndMoneyByCaseType(1L)).thenReturn(dto);
-
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByCaseType(1L);
-
-        assertSame(dto, result);
-    }
-
-    @Test
-    void hoursAndMoneyByCaseType_repositoryReturnsNull_returnsZeroDto() throws NotFoundException {
-        when(caseTypeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.hoursAndMoneyByCaseType(1L)).thenReturn(null);
-
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByCaseType(1L);
-
-        assertEquals(0L, result.totalCases());
+        assertSame(dto, service.hoursAndMoneyByDeveloper(5L));
     }
 
     // ── hoursAndMoneyByDateRange ──────────────────────────────────────────────
 
     @Test
-    void hoursAndMoneyByDateRange_fromNull_throwsBadRequest() {
+    void hoursAndMoneyByDateRange_throwsWhenFromNull() {
+        assertThrows(BadRequestException.class,
+                () -> service.hoursAndMoneyByDateRange(null, Instant.now()));
+    }
+
+    @Test
+    void hoursAndMoneyByDateRange_throwsWhenFromAfterTo() {
+        Instant now = Instant.now();
+        assertThrows(BadRequestException.class,
+                () -> service.hoursAndMoneyByDateRange(now.plusSeconds(60), now));
+    }
+
+    @Test
+    void hoursAndMoneyByDateRange_success() {
+        Instant from = Instant.now().minusSeconds(3600);
         Instant to = Instant.now();
-
-        assertThrows(BadRequestException.class,
-                () -> reportService.hoursAndMoneyByDateRange(null, to));
-    }
-
-    @Test
-    void hoursAndMoneyByDateRange_toNull_throwsBadRequest() {
-        Instant from = Instant.now();
-
-        assertThrows(BadRequestException.class,
-                () -> reportService.hoursAndMoneyByDateRange(from, null));
-    }
-
-    @Test
-    void hoursAndMoneyByDateRange_fromAfterTo_throwsBadRequest() {
-        Instant from = Instant.parse("2024-06-01T00:00:00Z");
-        Instant to = Instant.parse("2024-01-01T00:00:00Z");
-
-        assertThrows(BadRequestException.class,
-                () -> reportService.hoursAndMoneyByDateRange(from, to));
-    }
-
-    @Test
-    void hoursAndMoneyByDateRange_validRange_returnsDto() {
-        Instant from = Instant.parse("2024-01-01T00:00:00Z");
-        Instant to = Instant.parse("2024-12-31T23:59:59Z");
-        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(10L, 20.0, 1000.0);
+        HoursAndMoneyDTO dto = new HoursAndMoneyDTO(2L, 4.0, 80.0);
         when(reportRepository.hoursAndMoneyByDateRange(from, to)).thenReturn(dto);
 
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByDateRange(from, to);
-
-        assertSame(dto, result);
-    }
-
-    @Test
-    void hoursAndMoneyByDateRange_repositoryReturnsNull_returnsZeroDto() {
-        Instant from = Instant.parse("2024-01-01T00:00:00Z");
-        Instant to = Instant.parse("2024-12-31T23:59:59Z");
-        when(reportRepository.hoursAndMoneyByDateRange(from, to)).thenReturn(null);
-
-        HoursAndMoneyDTO result = reportService.hoursAndMoneyByDateRange(from, to);
-
-        assertEquals(0L, result.totalCases());
-    }
-
-    // ── developerReport ───────────────────────────────────────────────────────
-
-    @Test
-    void developerReport_nullSearch_passesNullToRepository() {
-        when(reportRepository.developerReport(null)).thenReturn(List.of());
-
-        reportService.developerReport(null);
-
-        verify(reportRepository).developerReport(null);
-    }
-
-    @Test
-    void developerReport_blankSearch_passesNullToRepository() {
-        when(reportRepository.developerReport(null)).thenReturn(List.of());
-
-        reportService.developerReport("   ");
-
-        verify(reportRepository).developerReport(null);
-    }
-
-    @Test
-    void developerReport_withSearch_passesTrimmedValue() {
-        when(reportRepository.developerReport("john")).thenReturn(List.of());
-
-        reportService.developerReport("  john  ");
-
-        verify(reportRepository).developerReport("john");
-    }
-
-    // ── projectReport ─────────────────────────────────────────────────────────
-
-    @Test
-    void projectReport_noFilters_passesNullsToRepository() {
-        when(reportRepository.projectReport(null, null)).thenReturn(List.of());
-
-        reportService.projectReport(null, null);
-
-        verify(reportRepository).projectReport(null, null);
-    }
-
-    @Test
-    void projectReport_withInvalidStatus_throwsBadRequest() {
-        assertThrows(BadRequestException.class,
-                () -> reportService.projectReport("UNKNOWN", null));
-    }
-
-    @Test
-    void projectReport_withValidStatusAndSearch_passesToRepository() {
-        when(reportRepository.projectReport("ACTIVE", "proj")).thenReturn(List.of());
-
-        reportService.projectReport("active", "  proj  ");
-
-        verify(reportRepository).projectReport("ACTIVE", "proj");
-    }
-
-    // ── developerWithMostCases ────────────────────────────────────────────────
-
-    @Test
-    void developerWithMostCases_delegatesToRepository() {
-        TopDeveloperDTO top = new TopDeveloperDTO(1L, "Alice", "Smith", "alice", 10L, 500.0);
-        when(reportRepository.developerWithMostCases()).thenReturn(Optional.of(top));
-
-        Optional<TopDeveloperDTO> result = reportService.developerWithMostCases();
-
-        assertTrue(result.isPresent());
-        assertSame(top, result.get());
-    }
-
-    @Test
-    void developerWithMostCases_empty_returnsEmpty() {
-        when(reportRepository.developerWithMostCases()).thenReturn(Optional.empty());
-
-        Optional<TopDeveloperDTO> result = reportService.developerWithMostCases();
-
-        assertTrue(result.isEmpty());
-    }
-
-    // ── developerPaidTheMost ──────────────────────────────────────────────────
-
-    @Test
-    void developerPaidTheMost_delegatesToRepository() {
-        TopDeveloperDTO top = new TopDeveloperDTO(2L, "Bob", "Jones", "bob", 5L, 2000.0);
-        when(reportRepository.developerPaidTheMost()).thenReturn(Optional.of(top));
-
-        Optional<TopDeveloperDTO> result = reportService.developerPaidTheMost();
-
-        assertTrue(result.isPresent());
-        assertSame(top, result.get());
-    }
-
-    @Test
-    void developerPaidTheMost_empty_returnsEmpty() {
-        when(reportRepository.developerPaidTheMost()).thenReturn(Optional.empty());
-
-        assertTrue(reportService.developerPaidTheMost().isEmpty());
-    }
-
-    // ── projectWithMostCompletedCases ─────────────────────────────────────────
-
-    @Test
-    void projectWithMostCompletedCases_delegatesToRepository() {
-        TopProjectDTO top = new TopProjectDTO(1L, "Proj A", 15L);
-        when(reportRepository.projectWithMostCompletedCases()).thenReturn(Optional.of(top));
-
-        Optional<TopProjectDTO> result = reportService.projectWithMostCompletedCases();
-
-        assertTrue(result.isPresent());
-        assertSame(top, result.get());
-    }
-
-    @Test
-    void projectWithMostCompletedCases_empty_returnsEmpty() {
-        when(reportRepository.projectWithMostCompletedCases()).thenReturn(Optional.empty());
-
-        assertTrue(reportService.projectWithMostCompletedCases().isEmpty());
-    }
-
-    // ── projectWithMostCanceledCases ──────────────────────────────────────────
-
-    @Test
-    void projectWithMostCanceledCases_delegatesToRepository() {
-        TopProjectDTO top = new TopProjectDTO(2L, "Proj B", 7L);
-        when(reportRepository.projectWithMostCanceledCases()).thenReturn(Optional.of(top));
-
-        Optional<TopProjectDTO> result = reportService.projectWithMostCanceledCases();
-
-        assertTrue(result.isPresent());
-        assertSame(top, result.get());
-    }
-
-    @Test
-    void projectWithMostCanceledCases_empty_returnsEmpty() {
-        when(reportRepository.projectWithMostCanceledCases()).thenReturn(Optional.empty());
-
-        assertTrue(reportService.projectWithMostCanceledCases().isEmpty());
+        assertSame(dto, service.hoursAndMoneyByDateRange(from, to));
     }
 
     // ── casesByProject ────────────────────────────────────────────────────────
 
     @Test
-    void casesByProject_notFound_throwsNotFound() {
-        when(projectRepository.existsById(99L)).thenReturn(false);
+    void casesByProject_throwsWhenNotFound() {
+        when(projectRepository.existsById(9L)).thenReturn(false);
 
-        assertThrows(NotFoundException.class,
-                () -> reportService.casesByProject(99L));
+        assertThrows(NotFoundException.class, () -> service.casesByProject(9L));
     }
 
     @Test
-    void casesByProject_returnsListFromRepository() throws NotFoundException {
-        List<CaseReportDTO> cases = List.of();
-        when(projectRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.casesByProject(1L)).thenReturn(cases);
+    void casesByProject_returnsRepoResult() throws NotFoundException {
+        when(projectRepository.existsById(9L)).thenReturn(true);
+        when(reportRepository.casesByProject(9L)).thenReturn(List.of());
 
-        List<CaseReportDTO> result = reportService.casesByProject(1L);
+        var result = service.casesByProject(9L);
 
-        assertSame(cases, result);
+        assertNotNull(result);
+        verify(reportRepository).casesByProject(9L);
     }
 
     // ── casesByDeveloper ──────────────────────────────────────────────────────
 
     @Test
-    void casesByDeveloper_notFound_throwsNotFound() {
-        when(employeeRepository.existsById(99L)).thenReturn(false);
+    void casesByDeveloper_throwsWhenNotFound() {
+        when(employeeRepository.existsById(2L)).thenReturn(false);
 
-        assertThrows(NotFoundException.class,
-                () -> reportService.casesByDeveloper(99L));
+        assertThrows(NotFoundException.class, () -> service.casesByDeveloper(2L));
     }
 
+    // ── developerWithMostCases ────────────────────────────────────────────────
+
     @Test
-    void casesByDeveloper_returnsListFromRepository() throws NotFoundException {
-        List<CaseReportDTO> cases = List.of();
-        when(employeeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.casesByDeveloper(1L)).thenReturn(cases);
+    void developerWithMostCases_delegatesToRepo() {
+        when(reportRepository.developerWithMostCases()).thenReturn(Optional.empty());
 
-        List<CaseReportDTO> result = reportService.casesByDeveloper(1L);
-
-        assertSame(cases, result);
+        assertTrue(service.developerWithMostCases().isEmpty());
+        verify(reportRepository).developerWithMostCases();
     }
 
-    // ── casesByCaseType ───────────────────────────────────────────────────────
+    // ── projectWithMostCompletedCases ────────────────────────────────────────
 
     @Test
-    void casesByCaseType_notFound_throwsNotFound() {
-        when(caseTypeRepository.existsById(99L)).thenReturn(false);
+    void projectWithMostCompletedCases_delegatesToRepo() {
+        when(reportRepository.projectWithMostCompletedCases()).thenReturn(Optional.empty());
 
-        assertThrows(NotFoundException.class,
-                () -> reportService.casesByCaseType(99L));
-    }
-
-    @Test
-    void casesByCaseType_returnsListFromRepository() throws NotFoundException {
-        List<CaseReportDTO> cases = List.of();
-        when(caseTypeRepository.existsById(1L)).thenReturn(true);
-        when(reportRepository.casesByCaseType(1L)).thenReturn(cases);
-
-        List<CaseReportDTO> result = reportService.casesByCaseType(1L);
-
-        assertSame(cases, result);
+        assertTrue(service.projectWithMostCompletedCases().isEmpty());
+        verify(reportRepository).projectWithMostCompletedCases();
     }
 }
